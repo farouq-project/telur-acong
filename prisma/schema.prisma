@@ -1,0 +1,192 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  STAFF
+}
+
+enum MedCategory {
+  MEDICINE
+  VACCINE
+}
+
+enum NotificationType {
+  LOW_EGG_STOCK
+  LOW_FEED_STOCK
+  VACCINATION_DUE
+  GENERAL
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(STAFF)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model EggProduction {
+  id           String   @id @default(cuid())
+  date         DateTime @db.Date
+  house        String
+  goodEggs     Int      @default(0)
+  crackedEggs  Int      @default(0)
+  rejectedEggs Int      @default(0)
+  notes        String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([date])
+  @@map("egg_production")
+}
+
+model EggSale {
+  id           String   @id @default(cuid())
+  date         DateTime @db.Date
+  customerName String
+  qtySold      Int
+  unitPrice    Decimal  @db.Decimal(12, 2)
+  totalValue   Decimal  @db.Decimal(14, 2)
+  notes        String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([date])
+  @@map("egg_sales")
+}
+
+model FeedProduct {
+  id        String   @id @default(cuid())
+  name      String
+  unit      String   @default("kg")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchases FeedPurchase[]
+  usages    FeedUsage[]
+  sales     FeedSale[]
+
+  @@map("feed_products")
+}
+
+model FeedPurchase {
+  id            String      @id @default(cuid())
+  date          DateTime    @db.Date
+  feedProductId String
+  qty           Decimal     @db.Decimal(10, 2)
+  notes         String?     @db.Text
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  feedProduct FeedProduct @relation(fields: [feedProductId], references: [id], onDelete: Restrict)
+
+  @@index([date])
+  @@index([feedProductId])
+  @@map("feed_purchases")
+}
+
+model FeedUsage {
+  id            String      @id @default(cuid())
+  date          DateTime    @db.Date
+  house         String
+  feedProductId String
+  qtyUsed       Decimal     @db.Decimal(10, 2)
+  notes         String?     @db.Text
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  feedProduct FeedProduct @relation(fields: [feedProductId], references: [id], onDelete: Restrict)
+
+  @@index([date])
+  @@index([feedProductId])
+  @@map("feed_usage")
+}
+
+model FeedSale {
+  id            String      @id @default(cuid())
+  date          DateTime    @db.Date
+  customerName  String
+  feedProductId String
+  qty           Decimal     @db.Decimal(10, 2)
+  unitPrice     Decimal     @db.Decimal(12, 2)
+  totalValue    Decimal     @db.Decimal(14, 2)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  feedProduct FeedProduct @relation(fields: [feedProductId], references: [id], onDelete: Restrict)
+
+  @@index([date])
+  @@index([feedProductId])
+  @@map("feed_sales")
+}
+
+model MedicineVaccine {
+  id          String      @id @default(cuid())
+  date        DateTime    @db.Date
+  productName String
+  category    MedCategory
+  qty         Decimal     @db.Decimal(10, 2)
+  unit        String      @default("botol")
+  notes       String?     @db.Text
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([date])
+  @@index([category])
+  @@map("medicine_vaccines")
+}
+
+model VaccinationSchedule {
+  id           String   @id @default(cuid())
+  vaccineName  String
+  scheduleDate DateTime @db.Date
+  notes        String?  @db.Text
+  isDone       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([scheduleDate])
+  @@map("vaccination_schedules")
+}
+
+model Mortality {
+  id        String   @id @default(cuid())
+  date      DateTime @db.Date
+  house     String
+  count     Int
+  notes     String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+  @@map("mortality")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String           @db.Text
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
