@@ -5,14 +5,22 @@ export type NotificationType =
   | "LOW_FEED_STOCK"
   | "VACCINATION_DUE"
   | "GENERAL";
+export type FinType = "INCOME" | "EXPENSE";
 
 export interface EggProduction {
   id: string;
   date: string;
   house: string;
+  populasi?: number | null;
   goodEggs: number;
   crackedEggs: number;
   rejectedEggs: number;
+  goodEggsKg?: number | null;
+  crackedEggsKg?: number | null;
+  rejectedEggsKg?: number | null;
+  feedQtyKg?: number | null;
+  feedPricePerKg?: number | null;
+  mortality?: number | null;
   notes?: string | null;
   createdAt: string;
   updatedAt?: string;
@@ -22,6 +30,7 @@ export interface EggSale {
   id: string;
   date: string;
   customerName: string;
+  invoiceNo?: string | null;
   qtySold: number;
   unitPrice: number;
   totalValue: number;
@@ -116,6 +125,28 @@ export interface Notification {
   createdAt: string;
 }
 
+export interface FinancialNote {
+  id: string;
+  date: string;
+  type: FinType;
+  amount: number;
+  description: string;
+  userId: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface HouseMetric {
+  house: string;
+  totalFeedKg: number;
+  totalGoodEggsKg: number;
+  totalGoodEggs: number;
+  avgPopulasi: number;
+  feedIntake: number;
+  fcr: number;
+  hd: number;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -137,6 +168,7 @@ export interface DashboardStats {
   productionTrend: { date: string; value: number }[];
   salesTrend: { date: string; value: number }[];
   mortalityTrend: { date: string; value: number }[];
+  houseMetrics: HouseMetric[];
 }
 
 export interface ApiResponse<T> {

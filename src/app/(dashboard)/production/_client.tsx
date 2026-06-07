@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Search, Edit2, Trash2, Loader2, X } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Loader2, X, ChevronDown, ChevronUp } from "lucide-react";
 import { MobileHeader } from "@/components/layout/MobileHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,13 @@ const schema = z.object({
   goodEggs: z.coerce.number().min(0, "Minimal 0"),
   crackedEggs: z.coerce.number().min(0, "Minimal 0"),
   rejectedEggs: z.coerce.number().min(0, "Minimal 0"),
+  populasi: z.coerce.number().min(0).optional().or(z.literal("")),
+  goodEggsKg: z.coerce.number().min(0).optional().or(z.literal("")),
+  crackedEggsKg: z.coerce.number().min(0).optional().or(z.literal("")),
+  rejectedEggsKg: z.coerce.number().min(0).optional().or(z.literal("")),
+  feedQtyKg: z.coerce.number().min(0).optional().or(z.literal("")),
+  feedPricePerKg: z.coerce.number().min(0).optional().or(z.literal("")),
+  mortality: z.coerce.number().min(0).optional().or(z.literal("")),
   notes: z.string().optional(),
 });
 
@@ -32,6 +39,17 @@ type FormData = z.infer<typeof schema>;
 
 interface Props {
   initialData: EggProduction[];
+}
+
+function computeMetrics(r: EggProduction) {
+  const totalEggs = r.goodEggs + r.crackedEggs + r.rejectedEggs;
+  const hd = r.populasi && r.populasi > 0 ? ((totalEggs / r.populasi) * 100) : null;
+  const feedIntake = r.populasi && r.populasi > 0 && r.feedQtyKg ? (r.feedQtyKg / r.populasi) : null;
+  const fcr = r.goodEggsKg && r.goodEggsKg > 0 && r.feedQtyKg ? ((r.feedQtyKg / r.goodEggsKg) * 100) : null;
+  const hpp = r.goodEggsKg && r.goodEggsKg > 0 && r.feedQtyKg && r.feedPricePerKg
+    ? ((r.feedQtyKg * r.feedPricePerKg) / r.goodEggsKg)
+    : null;
+  return { hd, feedIntake, fcr, hpp };
 }
 
 export default function ProductionClient({ initialData }: Props) {
@@ -45,10 +63,15 @@ export default function ProductionClient({ initialData }: Props) {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { date: todayISO(), house: "", goodEggs: 0, crackedEggs: 0, rejectedEggs: 0, notes: "" },
+    defaultValues: {
+      date: todayISO(), house: "", goodEggs: 0, crackedEggs: 0, rejectedEggs: 0,
+      populasi: "", goodEggsKg: "", crackedEggsKg: "", rejectedEggsKg: "",
+      feedQtyKg: "", feedPricePerKg: "", mortality: "", notes: "",
+    },
   });
 
   const fetchData = useCallback(async () => {
@@ -64,16 +87,23 @@ export default function ProductionClient({ initialData }: Props) {
     }
   }, [search]);
 
-  // Only re-fetch when search changes (initial data is pre-loaded)
   useEffect(() => {
     if (search !== "") fetchData();
     else if (records !== initialData) fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
+  const defaultValues = {
+    date: todayISO(), house: "", goodEggs: 0, crackedEggs: 0, rejectedEggs: 0,
+    populasi: "" as const, goodEggsKg: "" as const, crackedEggsKg: "" as const,
+    rejectedEggsKg: "" as const, feedQtyKg: "" as const, feedPricePerKg: "" as const,
+    mortality: "" as const, notes: "",
+  };
+
   function openCreate() {
-    form.reset({ date: todayISO(), house: "", goodEggs: 0, crackedEggs: 0, rejectedEggs: 0, notes: "" });
+    form.reset(defaultValues);
     setEditingId(null);
+    setShowAdvanced(false);
     setIsSheetOpen(true);
   }
 
@@ -84,9 +114,18 @@ export default function ProductionClient({ initialData }: Props) {
       goodEggs: record.goodEggs,
       crackedEggs: record.crackedEggs,
       rejectedEggs: record.rejectedEggs,
+      populasi: record.populasi ?? "",
+      goodEggsKg: record.goodEggsKg ?? "",
+      crackedEggsKg: record.crackedEggsKg ?? "",
+      rejectedEggsKg: record.rejectedEggsKg ?? "",
+      feedQtyKg: record.feedQtyKg ?? "",
+      feedPricePerKg: record.feedPricePerKg ?? "",
+      mortality: record.mortality ?? "",
       notes: record.notes ?? "",
     });
     setEditingId(record.id);
+    const hasAdvanced = !!(record.populasi || record.feedQtyKg || record.goodEggsKg);
+    setShowAdvanced(hasAdvanced);
     setIsSheetOpen(true);
   }
 
@@ -95,10 +134,20 @@ export default function ProductionClient({ initialData }: Props) {
     try {
       const url = editingId ? `/api/v1/production/${editingId}` : "/api/v1/production";
       const method = editingId ? "PUT" : "POST";
+      const payload = {
+        ...data,
+        populasi: data.populasi !== "" ? data.populasi : null,
+        goodEggsKg: data.goodEggsKg !== "" ? data.goodEggsKg : null,
+        crackedEggsKg: data.crackedEggsKg !== "" ? data.crackedEggsKg : null,
+        rejectedEggsKg: data.rejectedEggsKg !== "" ? data.rejectedEggsKg : null,
+        feedQtyKg: data.feedQtyKg !== "" ? data.feedQtyKg : null,
+        feedPricePerKg: data.feedPricePerKg !== "" ? data.feedPricePerKg : null,
+        mortality: data.mortality !== "" ? data.mortality : null,
+      };
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
@@ -152,7 +201,7 @@ export default function ProductionClient({ initialData }: Props) {
 
         {fetching ? (
           <div className="space-y-3">
-            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)}
           </div>
         ) : records.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
@@ -161,34 +210,59 @@ export default function ProductionClient({ initialData }: Props) {
           </div>
         ) : (
           <div className="space-y-2">
-            {records.map((r) => (
-              <div key={r.id} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs text-gray-400">{formatDate(r.date)}</span>
-                      <Badge variant="secondary" className="text-xs">{r.house}</Badge>
+            {records.map((r) => {
+              const { hd, feedIntake, fcr, hpp } = computeMetrics(r);
+              return (
+                <div key={r.id} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs text-gray-400">{formatDate(r.date)}</span>
+                        <Badge variant="secondary" className="text-xs">{r.house}</Badge>
+                        {r.populasi && <span className="text-xs text-gray-400">{formatNumber(r.populasi)} ekor</span>}
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-sm">
+                        <span className="text-green-700 font-semibold">{formatNumber(r.goodEggs)} bagus</span>
+                        {r.goodEggsKg && <span className="text-green-600 text-xs">({r.goodEggsKg} kg)</span>}
+                        {r.crackedEggs > 0 && <span className="text-yellow-600">{r.crackedEggs} retak</span>}
+                        {r.rejectedEggs > 0 && <span className="text-red-500">{r.rejectedEggs} BS</span>}
+                        {r.mortality && r.mortality > 0 && <span className="text-red-600 text-xs">✝ {r.mortality} mati</span>}
+                      </div>
+                      {r.feedQtyKg && (
+                        <p className="text-xs text-amber-600 mt-1">Pakan: {r.feedQtyKg} kg</p>
+                      )}
+                      {(hd !== null || feedIntake !== null || fcr !== null || hpp !== null) && (
+                        <div className="flex flex-wrap gap-2 mt-1.5">
+                          {hd !== null && (
+                            <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">HD {hd.toFixed(1)}%</span>
+                          )}
+                          {feedIntake !== null && (
+                            <span className="text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">FI {feedIntake.toFixed(3)} kg/ekor</span>
+                          )}
+                          {fcr !== null && (
+                            <span className="text-xs bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded">FCR {fcr.toFixed(1)}%</span>
+                          )}
+                          {hpp !== null && (
+                            <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded">HPP Rp{formatNumber(Math.round(hpp))}/kg</span>
+                          )}
+                        </div>
+                      )}
+                      {r.notes && <p className="text-xs text-gray-400 mt-1 truncate">{r.notes}</p>}
                     </div>
-                    <div className="flex gap-3 text-sm">
-                      <span className="text-green-700 font-semibold">{formatNumber(r.goodEggs)} bagus</span>
-                      {r.crackedEggs > 0 && <span className="text-yellow-600">{r.crackedEggs} retak</span>}
-                      {r.rejectedEggs > 0 && <span className="text-red-500">{r.rejectedEggs} BS</span>}
-                    </div>
-                    {r.notes && <p className="text-xs text-gray-400 mt-1 truncate">{r.notes}</p>}
-                  </div>
-                  <div className="flex gap-1 ml-2">
-                    <button onClick={() => openEdit(r)} className="p-2 rounded-lg hover:bg-gray-100 active:bg-gray-200">
-                      <Edit2 className="w-4 h-4 text-gray-400" />
-                    </button>
-                    {isOwner && (
-                      <button onClick={() => setDeleteId(r.id)} className="p-2 rounded-lg hover:bg-red-50 active:bg-red-100">
-                        <Trash2 className="w-4 h-4 text-red-400" />
+                    <div className="flex gap-1 ml-2">
+                      <button onClick={() => openEdit(r)} className="p-2 rounded-lg hover:bg-gray-100 active:bg-gray-200">
+                        <Edit2 className="w-4 h-4 text-gray-400" />
                       </button>
-                    )}
+                      {isOwner && (
+                        <button onClick={() => setDeleteId(r.id)} className="p-2 rounded-lg hover:bg-red-50 active:bg-red-100">
+                          <Trash2 className="w-4 h-4 text-red-400" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -202,7 +276,7 @@ export default function ProductionClient({ initialData }: Props) {
       </button>
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto rounded-t-2xl">
+        <SheetContent side="bottom" className="max-h-[92vh] overflow-y-auto rounded-t-2xl">
           <SheetHeader className="mb-4">
             <SheetTitle>{editingId ? "Edit Produksi" : "Tambah Produksi"}</SheetTitle>
           </SheetHeader>
@@ -220,24 +294,77 @@ export default function ProductionClient({ initialData }: Props) {
                 )}
               </div>
             </div>
+
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs">Telur Bagus</Label>
+                <Label className="text-xs">Telur Bagus (butir)</Label>
                 <Input type="number" min="0" className="h-11" {...form.register("goodEggs")} />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Retak</Label>
+                <Label className="text-xs">Retak (butir)</Label>
                 <Input type="number" min="0" className="h-11" {...form.register("crackedEggs")} />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">BS</Label>
+                <Label className="text-xs">BS (butir)</Label>
                 <Input type="number" min="0" className="h-11" {...form.register("rejectedEggs")} />
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 w-full py-1"
+            >
+              {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              Detail Lanjutan (Berat, Pakan, Populasi)
+            </button>
+
+            {showAdvanced && (
+              <div className="space-y-4 border-t pt-3">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Bagus (kg)</Label>
+                    <Input type="number" min="0" step="0.01" className="h-11" placeholder="0.00" {...form.register("goodEggsKg")} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Retak (kg)</Label>
+                    <Input type="number" min="0" step="0.01" className="h-11" placeholder="0.00" {...form.register("crackedEggsKg")} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">BS (kg)</Label>
+                    <Input type="number" min="0" step="0.01" className="h-11" placeholder="0.00" {...form.register("rejectedEggsKg")} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Populasi (ekor)</Label>
+                    <Input type="number" min="0" className="h-11" placeholder="0" {...form.register("populasi")} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Kematian (ekor)</Label>
+                    <Input type="number" min="0" className="h-11" placeholder="0" {...form.register("mortality")} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Pakan (kg)</Label>
+                    <Input type="number" min="0" step="0.01" className="h-11" placeholder="0.00" {...form.register("feedQtyKg")} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Harga Pakan (Rp/kg)</Label>
+                    <Input type="number" min="0" className="h-11" placeholder="0" {...form.register("feedPricePerKg")} />
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-1.5">
               <Label>Catatan (opsional)</Label>
               <Textarea placeholder="Catatan tambahan..." rows={2} {...form.register("notes")} />
             </div>
+
             <div className="flex gap-3 pt-2 pb-4">
               <Button type="button" variant="outline" className="flex-1 h-12" onClick={() => setIsSheetOpen(false)}>Batal</Button>
               <Button type="submit" className="flex-1 h-12 bg-green-600 hover:bg-green-700" disabled={submitting}>

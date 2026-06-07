@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import {
-  getProductions,
-  createProduction,
-} from "@/services/production.service";
+import { getProductions, createProduction } from "@/services/production.service";
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,7 +30,8 @@ export async function POST(request: NextRequest) {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await request.json();
-    const { date, house, goodEggs, crackedEggs, rejectedEggs, notes } = body;
+    const { date, house, populasi, goodEggs, crackedEggs, rejectedEggs,
+            goodEggsKg, crackedEggsKg, rejectedEggsKg, feedQtyKg, feedPricePerKg, mortality, notes } = body;
 
     if (!date || !house || goodEggs === undefined) {
       return NextResponse.json({ error: "Data tidak lengkap" }, { status: 400 });
@@ -42,9 +40,16 @@ export async function POST(request: NextRequest) {
     const record = await createProduction({
       date,
       house,
+      populasi: populasi != null ? parseInt(populasi) : undefined,
       goodEggs: parseInt(goodEggs),
       crackedEggs: parseInt(crackedEggs ?? 0),
       rejectedEggs: parseInt(rejectedEggs ?? 0),
+      goodEggsKg: goodEggsKg != null ? parseFloat(goodEggsKg) : undefined,
+      crackedEggsKg: crackedEggsKg != null ? parseFloat(crackedEggsKg) : undefined,
+      rejectedEggsKg: rejectedEggsKg != null ? parseFloat(rejectedEggsKg) : undefined,
+      feedQtyKg: feedQtyKg != null ? parseFloat(feedQtyKg) : undefined,
+      feedPricePerKg: feedPricePerKg != null ? parseFloat(feedPricePerKg) : undefined,
+      mortality: mortality != null ? parseInt(mortality) : undefined,
       notes,
     });
 

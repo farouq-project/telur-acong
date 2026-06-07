@@ -7,7 +7,7 @@ export default withAuth(
     const { pathname } = req.nextUrl;
 
     // Owner-only routes
-    const ownerRoutes = ["/settings/users"];
+    const ownerRoutes = ["/settings/users", "/financial"];
     const isOwnerRoute = ownerRoutes.some((route) =>
       pathname.startsWith(route)
     );

@@ -1,14 +1,18 @@
-import { getTotalGoodEggs } from "./production.service";
 import { getTotalEggsSold } from "./sales.service";
 import { decimalToNumber } from "@/lib/utils";
 import prisma from "@/lib/prisma";
 
-export async function getEggStock(): Promise<number> {
-  const [produced, sold] = await Promise.all([
-    getTotalGoodEggs(),
+export async function getEggStockKg(): Promise<number> {
+  const [producedResult, sold] = await Promise.all([
+    prisma.eggProduction.aggregate({ _sum: { goodEggsKg: true } }),
     getTotalEggsSold(),
   ]);
-  return Math.max(0, produced - sold);
+  const producedKg = decimalToNumber(producedResult._sum.goodEggsKg);
+  return Math.max(0, producedKg - sold);
+}
+
+export async function getEggStock(): Promise<number> {
+  return getEggStockKg();
 }
 
 export interface FeedStockItem {

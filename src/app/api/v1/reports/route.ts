@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       }
       case "sales": {
         const result = await getSales({ from, to, limit: 1000 });
-        headers = ["Tanggal", "Pelanggan", "Jumlah", "Harga Satuan", "Total", "Catatan"];
+        headers = ["Tanggal", "Pelanggan", "Jumlah (kg)", "Harga/kg", "Total", "Catatan"];
         data = result.data.map((r) => ({
           Tanggal: formatDate(r.date),
           Pelanggan: r.customerName,

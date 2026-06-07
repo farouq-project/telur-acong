@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Search, Edit2, Trash2, Loader2, X } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Loader2, X, FileText, Printer } from "lucide-react";
 import { MobileHeader } from "@/components/layout/MobileHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,7 @@ import type { EggSale } from "@/types";
 const schema = z.object({
   date: z.string().min(1),
   customerName: z.string().min(1, "Nama pelanggan wajib diisi"),
-  qtySold: z.coerce.number().min(1, "Jumlah minimal 1"),
+  qtySold: z.coerce.number().min(0.01, "Jumlah minimal 0.01"),
   unitPrice: z.coerce.number().min(1, "Harga wajib diisi"),
   notes: z.string().optional(),
 });
@@ -30,6 +30,82 @@ type FormData = z.infer<typeof schema>;
 
 interface Props {
   initialData: EggSale[];
+}
+
+function InvoiceView({ sale }: { sale: EggSale }) {
+  const invoiceRef = useRef<HTMLDivElement>(null);
+
+  function handlePrint() {
+    const content = invoiceRef.current?.innerHTML ?? "";
+    const win = window.open("", "_blank", "width=600,height=700");
+    if (!win) return;
+    win.document.write(`
+      <html><head><title>Invoice ${sale.invoiceNo ?? ""}</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 24px; font-size: 14px; }
+        h2 { margin: 0 0 4px; font-size: 18px; }
+        .subtitle { color: #666; font-size: 12px; margin-bottom: 16px; }
+        .divider { border-top: 1px dashed #ccc; margin: 12px 0; }
+        .row { display: flex; justify-content: space-between; margin: 6px 0; }
+        .label { color: #555; }
+        .total { font-size: 16px; font-weight: bold; }
+        .footer { text-align: center; color: #999; font-size: 11px; margin-top: 20px; }
+      </style></head>
+      <body>${content}</body></html>
+    `);
+    win.document.close();
+    win.print();
+  }
+
+  return (
+    <div className="space-y-4">
+      <div ref={invoiceRef} className="p-4 bg-white border border-gray-200 rounded-xl">
+        <h2 className="text-lg font-bold text-gray-800">INVOICE</h2>
+        <p className="text-xs text-gray-400 subtitle">Telur Acong — Peternakan Ayam Petelur</p>
+        <div className="divider border-t border-dashed border-gray-200 my-3" />
+        <div className="space-y-2 text-sm">
+          <div className="row flex justify-between">
+            <span className="label text-gray-500">No. Invoice</span>
+            <span className="font-mono font-semibold">{sale.invoiceNo ?? "–"}</span>
+          </div>
+          <div className="row flex justify-between">
+            <span className="label text-gray-500">Tanggal</span>
+            <span>{formatDate(sale.date)}</span>
+          </div>
+          <div className="row flex justify-between">
+            <span className="label text-gray-500">Pelanggan</span>
+            <span className="font-medium">{sale.customerName}</span>
+          </div>
+        </div>
+        <div className="divider border-t border-dashed border-gray-200 my-3" />
+        <div className="space-y-2 text-sm">
+          <div className="row flex justify-between">
+            <span className="label text-gray-500">Telur (kg)</span>
+            <span>{formatNumber(sale.qtySold)} kg</span>
+          </div>
+          <div className="row flex justify-between">
+            <span className="label text-gray-500">Harga/kg</span>
+            <span>{formatRupiah(sale.unitPrice)}</span>
+          </div>
+        </div>
+        <div className="divider border-t border-gray-200 my-3" />
+        <div className="flex justify-between items-center">
+          <span className="font-semibold text-gray-700">Total</span>
+          <span className="total text-lg font-bold text-green-700">{formatRupiah(sale.totalValue)}</span>
+        </div>
+        {sale.notes && (
+          <p className="text-xs text-gray-400 mt-3 italic">{sale.notes}</p>
+        )}
+        <div className="footer text-center text-xs text-gray-300 mt-4 pt-3 border-t border-gray-100">
+          Terima kasih atas kepercayaan Anda
+        </div>
+      </div>
+      <Button onClick={handlePrint} className="w-full h-11 flex items-center gap-2 bg-blue-600 hover:bg-blue-700">
+        <Printer className="w-4 h-4" />
+        Cetak Invoice
+      </Button>
+    </div>
+  );
 }
 
 export default function SalesClient({ initialData }: Props) {
@@ -44,6 +120,7 @@ export default function SalesClient({ initialData }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [totalValue, setTotalValue] = useState(0);
+  const [invoiceSale, setInvoiceSale] = useState<EggSale | null>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -163,17 +240,23 @@ export default function SalesClient({ initialData }: Props) {
             {records.map((r) => (
               <div key={r.id} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
                 <div className="flex items-start justify-between">
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <p className="text-xs text-gray-400">{formatDate(r.date)}</p>
                     <p className="font-medium text-gray-800 text-sm">{r.customerName}</p>
                     <div className="flex gap-2 text-xs text-gray-500 mt-0.5">
-                      <span>{formatNumber(r.qtySold)} butir</span>
+                      <span>{formatNumber(r.qtySold)} kg</span>
                       <span>×</span>
-                      <span>{formatRupiah(r.unitPrice)}</span>
+                      <span>{formatRupiah(r.unitPrice)}/kg</span>
                     </div>
                     <p className="text-sm font-semibold text-purple-600 mt-1">{formatRupiah(r.totalValue)}</p>
+                    {r.invoiceNo && <p className="text-xs text-gray-300 font-mono">{r.invoiceNo}</p>}
                   </div>
                   <div className="flex gap-1">
+                    {r.invoiceNo && (
+                      <button onClick={() => setInvoiceSale(r)} className="p-2 rounded-lg hover:bg-blue-50">
+                        <FileText className="w-4 h-4 text-blue-400" />
+                      </button>
+                    )}
                     <button onClick={() => openEdit(r)} className="p-2 rounded-lg hover:bg-gray-100">
                       <Edit2 className="w-4 h-4 text-gray-400" />
                     </button>
@@ -219,11 +302,14 @@ export default function SalesClient({ initialData }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Jumlah (butir)</Label>
-                <Input type="number" min="1" className="h-11" {...form.register("qtySold")} />
+                <Label>Jumlah (kg)</Label>
+                <Input type="number" min="0.01" step="0.01" className="h-11" {...form.register("qtySold")} />
+                {form.formState.errors.qtySold && (
+                  <p className="text-xs text-red-500">{form.formState.errors.qtySold.message}</p>
+                )}
               </div>
               <div className="space-y-1.5">
-                <Label>Harga/butir (Rp)</Label>
+                <Label>Harga/kg (Rp)</Label>
                 <Input type="number" min="0" className="h-11" {...form.register("unitPrice")} />
               </div>
             </div>
@@ -244,6 +330,15 @@ export default function SalesClient({ initialData }: Props) {
               </Button>
             </div>
           </form>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={!!invoiceSale} onOpenChange={() => setInvoiceSale(null)}>
+        <SheetContent side="bottom" className="max-h-[92vh] overflow-y-auto rounded-t-2xl">
+          <SheetHeader className="mb-4">
+            <SheetTitle>Invoice</SheetTitle>
+          </SheetHeader>
+          {invoiceSale && <InvoiceView sale={invoiceSale} />}
         </SheetContent>
       </Sheet>
 

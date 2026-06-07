@@ -35,9 +35,8 @@ export async function PUT(
     const record = await updateSale(id, {
       date: body.date,
       customerName: body.customerName,
-      qtySold: body.qtySold !== undefined ? parseInt(body.qtySold) : undefined,
-      unitPrice:
-        body.unitPrice !== undefined ? parseFloat(body.unitPrice) : undefined,
+      qtySold: body.qtySold !== undefined ? parseFloat(body.qtySold) : undefined,
+      unitPrice: body.unitPrice !== undefined ? parseFloat(body.unitPrice) : undefined,
       notes: body.notes,
     });
 

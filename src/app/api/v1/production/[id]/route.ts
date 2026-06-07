@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import {
-  getProductionById,
-  updateProduction,
-  deleteProduction,
-} from "@/services/production.service";
+import { getProductionById, updateProduction, deleteProduction } from "@/services/production.service";
 
 export async function GET(
   _request: NextRequest,
@@ -39,9 +35,16 @@ export async function PUT(
     const record = await updateProduction(id, {
       date: body.date,
       house: body.house,
+      populasi: body.populasi != null ? parseInt(body.populasi) : undefined,
       goodEggs: body.goodEggs !== undefined ? parseInt(body.goodEggs) : undefined,
       crackedEggs: body.crackedEggs !== undefined ? parseInt(body.crackedEggs) : undefined,
       rejectedEggs: body.rejectedEggs !== undefined ? parseInt(body.rejectedEggs) : undefined,
+      goodEggsKg: body.goodEggsKg != null ? parseFloat(body.goodEggsKg) : undefined,
+      crackedEggsKg: body.crackedEggsKg != null ? parseFloat(body.crackedEggsKg) : undefined,
+      rejectedEggsKg: body.rejectedEggsKg != null ? parseFloat(body.rejectedEggsKg) : undefined,
+      feedQtyKg: body.feedQtyKg != null ? parseFloat(body.feedQtyKg) : undefined,
+      feedPricePerKg: body.feedPricePerKg != null ? parseFloat(body.feedPricePerKg) : undefined,
+      mortality: body.mortality != null ? parseInt(body.mortality) : undefined,
       notes: body.notes,
     });
 

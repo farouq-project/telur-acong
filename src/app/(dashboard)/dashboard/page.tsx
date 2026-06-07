@@ -62,7 +62,7 @@ export default async function DashboardPage() {
             color="bg-green-600"
             label="Stok Telur"
             value={formatNumber(stats.eggStock)}
-            unit="butir"
+            unit="kg"
             highlight
           />
           <StatCard
@@ -77,7 +77,7 @@ export default async function DashboardPage() {
             color="bg-purple-500"
             label="Penjualan Hari Ini"
             value={formatNumber(stats.todaySales)}
-            unit="butir"
+            unit="kg"
           />
           <StatCard
             icon={<Skull className="w-5 h-5 text-white" />}
@@ -146,6 +146,7 @@ export default async function DashboardPage() {
             productionTrend={stats.productionTrend}
             salesTrend={stats.salesTrend}
             mortalityTrend={stats.mortalityTrend}
+            houseMetrics={stats.houseMetrics}
           />
         )}
 

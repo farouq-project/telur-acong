@@ -1,4 +1,4 @@
-import { getTodayProduction, getMonthlyProduction, getProductionTrend } from "./production.service";
+import { getTodayProduction, getMonthlyProduction, getProductionTrend, getHouseMetrics } from "./production.service";
 import { getTodaySales, getMonthlySales, getSalesTrend } from "./sales.service";
 import { getEggStock, getFeedStock } from "./stock.service";
 import { getTodayMortality, getMonthlyMortality, getMortalityTrend } from "./mortality.service";
@@ -18,6 +18,7 @@ export async function getDashboardStats() {
     salesTrend,
     mortalityTrend,
     feedStocks,
+    houseMetrics,
   ] = await Promise.all([
     getEggStock(),
     getTodayProduction(),
@@ -31,6 +32,7 @@ export async function getDashboardStats() {
     getSalesTrend(30),
     getMortalityTrend(30),
     getFeedStock(),
+    getHouseMetrics(30),
   ]);
 
   return {
@@ -46,5 +48,6 @@ export async function getDashboardStats() {
     salesTrend,
     mortalityTrend,
     feedStocks,
+    houseMetrics,
   };
 }

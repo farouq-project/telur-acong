@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { getSales, createSale } from "@/services/sales.service";
-import { getEggStock } from "@/services/stock.service";
+
+function generateInvoiceNo(date: string) {
+  const d = date.replace(/-/g, "");
+  const suffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `INV-${d}-${suffix}`;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,19 +42,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Data tidak lengkap" }, { status: 400 });
     }
 
-    const currentStock = await getEggStock();
-    if (parseInt(qtySold) > currentStock) {
-      return NextResponse.json(
-        { error: `Stok telur tidak cukup. Stok saat ini: ${currentStock} butir` },
-        { status: 422 }
-      );
-    }
-
     const record = await createSale({
       date,
       customerName,
-      qtySold: parseInt(qtySold),
+      qtySold: parseFloat(qtySold),
       unitPrice: parseFloat(unitPrice),
+      invoiceNo: generateInvoiceNo(date),
       notes,
     });
 
