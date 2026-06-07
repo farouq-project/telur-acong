@@ -20,6 +20,10 @@ function randFloat(min: number, max: number, decimals = 1): number {
   return parseFloat((Math.random() * (max - min) + min).toFixed(decimals));
 }
 
+function clamp(val: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, val));
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -73,23 +77,68 @@ async function main() {
   console.log("✅ Feed Products (3 produk)");
 
   // ── Egg Production — 60 hari terakhir ─────────────────────────────────────
+  // Setiap kandang punya profil berbeda (umur ayam, performa) sehingga
+  // Feed Intake, FCR, dan HD bervariasi dan terlihat realistis di grafik.
 
   const houses = ["Kandang A", "Kandang B", "Kandang C"];
+
+  interface HouseProfile {
+    name: string;
+    startPopulasi: number;
+    hdBase: number;       // % HD dasar
+    hdTrend: number;      // perubahan % per hari (tren naik/turun produksi)
+    feedPerBirdBase: number; // kg pakan / ekor / hari
+  }
+
+  const houseProfiles: HouseProfile[] = [
+    { name: "Kandang A", startPopulasi: 5000, hdBase: 84, hdTrend: -0.04, feedPerBirdBase: 0.112 }, // ayam tua, performa menurun
+    { name: "Kandang B", startPopulasi: 4500, hdBase: 89, hdTrend: 0.015, feedPerBirdBase: 0.107 }, // puncak produksi
+    { name: "Kandang C", startPopulasi: 5500, hdBase: 75, hdTrend: 0.18, feedPerBirdBase: 0.101 },  // ayam muda, masih naik
+  ];
+
+  const runningPopulasi: Record<string, number> = {};
+  houseProfiles.forEach((p) => { runningPopulasi[p.name] = p.startPopulasi; });
+
   const productionRecords = [];
 
   for (let day = 59; day >= 0; day--) {
     const date = daysAgo(day);
-    // Skip ~5% of days (weekend low production)
-    const isLowDay = day % 7 === 0;
+    const daysElapsed = 59 - day; // 0 = 60 hari lalu, 59 = hari ini
 
-    for (const house of houses) {
-      const baseGood = isLowDay ? rand(180, 250) : rand(280, 380);
+    for (const profile of houseProfiles) {
+      const mortalityToday = rand(0, 2);
+      runningPopulasi[profile.name] = Math.max(0, runningPopulasi[profile.name] - mortalityToday);
+      const populasi = runningPopulasi[profile.name];
+
+      const hd = clamp(profile.hdBase + profile.hdTrend * daysElapsed + randFloat(-1.5, 1.5, 1), 60, 96);
+      const totalEggs = Math.round((populasi * hd) / 100);
+
+      const crackedEggs = rand(5, 20);
+      const rejectedEggs = rand(2, 10);
+      const goodEggs = Math.max(0, totalEggs - crackedEggs - rejectedEggs);
+
+      const avgEggWeightKg = randFloat(0.058, 0.066, 3);
+      const goodEggsKg = Math.round(goodEggs * avgEggWeightKg * 100) / 100;
+      const crackedEggsKg = Math.round(crackedEggs * avgEggWeightKg * 0.95 * 100) / 100;
+      const rejectedEggsKg = Math.round(rejectedEggs * avgEggWeightKg * 0.9 * 100) / 100;
+
+      const feedPerBird = profile.feedPerBirdBase + randFloat(-0.006, 0.006, 3);
+      const feedQtyKg = Math.round(populasi * feedPerBird * 100) / 100;
+      const feedPricePerKg = rand(7000, 7800);
+
       productionRecords.push({
         date,
-        house,
-        goodEggs: baseGood,
-        crackedEggs: rand(2, 12),
-        rejectedEggs: rand(0, 5),
+        house: profile.name,
+        populasi,
+        goodEggs,
+        crackedEggs,
+        rejectedEggs,
+        goodEggsKg,
+        crackedEggsKg,
+        rejectedEggsKg,
+        feedQtyKg,
+        feedPricePerKg,
+        mortality: mortalityToday > 0 ? mortalityToday : null,
         notes: day === 0 ? "Produksi hari ini" : undefined,
       });
     }
@@ -97,7 +146,7 @@ async function main() {
 
   await prisma.eggProduction.deleteMany({});
   await prisma.eggProduction.createMany({ data: productionRecords });
-  console.log(`✅ Egg Production (${productionRecords.length} catatan, 60 hari)`);
+  console.log(`✅ Egg Production (${productionRecords.length} catatan, 60 hari — dengan data populasi, pakan, HD, FCR, Feed Intake)`);
 
   // ── Egg Sales — 60 hari terakhir ──────────────────────────────────────────
 
@@ -112,38 +161,46 @@ async function main() {
     "RM Sate Pak Dadang",
   ];
 
+  function generateInvoiceNo(date: Date): string {
+    const d = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
+    const suffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `INV-${d}-${suffix}`;
+  }
+
   const salesData = [];
 
   for (let day = 59; day >= 1; day -= rand(1, 3)) {
     const date = daysAgo(day);
     const customer = customers[rand(0, customers.length - 1)];
-    const qty = rand(200, 800);
-    const unitPrice = rand(1600, 2000);
+    const qty = randFloat(20, 180, 1); // kg
+    const unitPrice = rand(24000, 28000); // Rp / kg
     salesData.push({
       date,
       customerName: customer,
+      invoiceNo: generateInvoiceNo(date),
       qtySold: qty,
       unitPrice,
-      totalValue: qty * unitPrice,
+      totalValue: Math.round(qty * unitPrice * 100) / 100,
       notes: rand(0, 3) === 0 ? "Pelanggan tetap" : undefined,
     });
   }
 
   // Pastikan ada penjualan hari ini
+  const todaySaleQty = randFloat(40, 90, 1);
+  const todaySalePrice = 26000;
   salesData.push({
     date: daysAgo(0),
     customerName: "Toko Pak Haji",
-    qtySold: rand(150, 300),
-    unitPrice: 1800,
-    totalValue: 0,
+    invoiceNo: generateInvoiceNo(daysAgo(0)),
+    qtySold: todaySaleQty,
+    unitPrice: todaySalePrice,
+    totalValue: Math.round(todaySaleQty * todaySalePrice * 100) / 100,
     notes: "Pengiriman pagi",
   });
-  salesData[salesData.length - 1].totalValue =
-    salesData[salesData.length - 1].qtySold * salesData[salesData.length - 1].unitPrice;
 
   await prisma.eggSale.deleteMany({});
   await prisma.eggSale.createMany({ data: salesData });
-  console.log(`✅ Egg Sales (${salesData.length} transaksi, 60 hari)`);
+  console.log(`✅ Egg Sales (${salesData.length} transaksi, 60 hari — satuan kg + invoice)`);
 
   // ── Feed Purchases ─────────────────────────────────────────────────────────
 
@@ -431,6 +488,58 @@ async function main() {
   });
   console.log("✅ Notifications (3 notifikasi)");
 
+  // ── Financial Notes — Catatan Keuangan (60 hari) ─────────────────────────
+
+  const financialData: { date: Date; type: "INCOME" | "EXPENSE"; amount: number; description: string; userId: string }[] = [];
+
+  // Pemasukan mingguan dari penjualan telur
+  for (let week = 0; week < 9; week++) {
+    const day = week * 7 + rand(0, 2);
+    financialData.push({
+      date: daysAgo(day),
+      type: "INCOME",
+      amount: rand(9_000_000, 16_000_000),
+      description: `Pendapatan penjualan telur minggu ke-${9 - week}`,
+      userId: owner.id,
+    });
+  }
+
+  // Pemasukan tambahan dari penjualan pakan/ayam afkir
+  financialData.push({ date: daysAgo(35), type: "INCOME", amount: rand(2_000_000, 4_000_000), description: "Penjualan ayam afkir Kandang A", userId: owner.id });
+  financialData.push({ date: daysAgo(12), type: "INCOME", amount: rand(1_500_000, 3_000_000), description: "Penjualan kotoran ternak (pupuk)", userId: owner.id });
+
+  // Pengeluaran operasional
+  const expenseDescriptions = [
+    "Pembelian pakan layer",
+    "Gaji karyawan kandang",
+    "Biaya listrik & air",
+    "Pembelian obat & vaksin",
+    "Perawatan & perbaikan kandang",
+    "Biaya transportasi distribusi telur",
+    "Pembelian peralatan kandang",
+    "Biaya bahan bakar genset",
+    "Sewa lahan / gudang pakan",
+  ];
+
+  for (let i = 0; i < 26; i++) {
+    const day = rand(0, 59);
+    financialData.push({
+      date: daysAgo(day),
+      type: "EXPENSE",
+      amount: rand(400_000, 6_500_000),
+      description: expenseDescriptions[rand(0, expenseDescriptions.length - 1)],
+      userId: owner.id,
+    });
+  }
+
+  // Pastikan ada catatan hari ini
+  financialData.push({ date: daysAgo(0), type: "INCOME", amount: rand(1_000_000, 2_500_000), description: "Penjualan telur tunai hari ini", userId: owner.id });
+  financialData.push({ date: daysAgo(0), type: "EXPENSE", amount: rand(300_000, 900_000), description: "Pembelian pakan tambahan", userId: owner.id });
+
+  await prisma.financialNote.deleteMany({});
+  await prisma.financialNote.createMany({ data: financialData });
+  console.log(`✅ Catatan Keuangan (${financialData.length} catatan — pemasukan & pengeluaran)`);
+
   // ── Summary ────────────────────────────────────────────────────────────────
 
   console.log("\n" + "═".repeat(50));
@@ -446,6 +555,7 @@ async function main() {
   console.log(`   💊 Medicine/Vaccine: ${medicineData.length} catatan`);
   console.log(`   📅 Vacc Schedules  : ${vaccinationData.length} jadwal`);
   console.log(`   ☠️  Mortality       : ${mortalityData.length} catatan`);
+  console.log(`   💵 Catatan Keuangan: ${financialData.length} catatan`);
   console.log("═".repeat(50));
   console.log("\n📋 Akun login:");
   console.log(`   Owner  : owner@farm.com  / Admin1234`);
