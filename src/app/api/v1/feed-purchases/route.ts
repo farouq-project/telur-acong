@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
       date: body.date,
       feedProductId: body.feedProductId,
       qty: parseFloat(body.qty),
+      pricePerKg: body.pricePerKg != null && body.pricePerKg !== "" ? parseFloat(body.pricePerKg) : undefined,
       notes: body.notes,
     });
 

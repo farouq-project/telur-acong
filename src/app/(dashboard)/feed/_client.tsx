@@ -23,6 +23,7 @@ const purchaseSchema = z.object({
   date: z.string().min(1),
   feedProductId: z.string().min(1, "Pilih produk pakan"),
   qty: z.coerce.number().min(0.01),
+  pricePerKg: z.coerce.number().min(0).optional().or(z.literal("")),
   notes: z.string().optional(),
 });
 
@@ -64,7 +65,7 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const purchaseForm = useForm<PurchaseForm>({ resolver: zodResolver(purchaseSchema), defaultValues: { date: todayISO(), feedProductId: "", qty: 0, notes: "" } });
+  const purchaseForm = useForm<PurchaseForm>({ resolver: zodResolver(purchaseSchema), defaultValues: { date: todayISO(), feedProductId: "", qty: 0, pricePerKg: "", notes: "" } });
   const saleForm = useForm<SaleForm>({ resolver: zodResolver(saleSchema), defaultValues: { date: todayISO(), customerName: "", feedProductId: "", qty: 0, unitPrice: 0 } });
   const productForm = useForm<ProductForm>({ resolver: zodResolver(productSchema), defaultValues: { name: "", unit: "kg" } });
 
@@ -90,7 +91,8 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
     setSubmitting(true);
     try {
       const url = editingId ? `/api/v1/feed-purchases/${editingId}` : "/api/v1/feed-purchases";
-      const res = await fetch(url, { method: editingId ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      const payload = { ...data, pricePerKg: data.pricePerKg !== "" ? data.pricePerKg : null };
+      const res = await fetch(url, { method: editingId ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error((await res.json()).error);
       toast({ variant: "success", title: "Pembelian disimpan" });
       setActiveSheet(null);
@@ -141,7 +143,7 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
   const isOwner = session?.user?.role === "OWNER";
 
   function openPurchase(record?: FeedPurchase) {
-    purchaseForm.reset(record ? { date: record.date.split("T")[0], feedProductId: record.feedProductId, qty: record.qty, notes: record.notes ?? "" } : { date: todayISO(), feedProductId: "", qty: 0, notes: "" });
+    purchaseForm.reset(record ? { date: record.date.split("T")[0], feedProductId: record.feedProductId, qty: record.qty, pricePerKg: record.pricePerKg ?? "", notes: record.notes ?? "" } : { date: todayISO(), feedProductId: "", qty: 0, pricePerKg: "", notes: "" });
     setEditingId(record?.id ?? null);
     setActiveSheet("purchase");
   }
@@ -180,7 +182,11 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
                   label="Pembelian"
                   title={(r.feedProduct as FeedProduct)?.name ?? ""}
                   qty={`${formatNumber(r.qty)} ${(r.feedProduct as FeedProduct)?.unit ?? "kg"}`}
-                  detail={r.notes || undefined}
+                  detail={
+                    r.pricePerKg != null && r.totalValue != null
+                      ? `Rp${formatNumber(r.pricePerKg)}/kg — ${formatRupiah(r.totalValue)}`
+                      : r.notes || undefined
+                  }
                   date={r.date}
                   onEdit={() => openPurchase(r)}
                   onDelete={() => setDeleteTarget({ id: r.id, type: "purchase" })}
@@ -200,7 +206,11 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
                   label="Pemakaian"
                   title={(r.feedProduct as FeedProduct)?.name ?? ""}
                   qty={`${formatNumber(r.qtyUsed)} ${(r.feedProduct as FeedProduct)?.unit ?? "kg"}`}
-                  detail={`Kandang ${r.house}`}
+                  detail={
+                    r.totalCost != null
+                      ? `Kandang ${r.house} — ${formatRupiah(r.totalCost)} (Rp${formatNumber(r.unitCost ?? 0)}/kg, FIFO)`
+                      : `Kandang ${r.house}`
+                  }
                   date={r.date}
                   isOwner={isOwner}
                 />
@@ -290,9 +300,15 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
                 <SelectContent>{products.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label>Jumlah</Label>
-              <Input type="number" step="0.01" className="h-11" {...purchaseForm.register("qty")} />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Jumlah</Label>
+                <Input type="number" step="0.01" className="h-11" {...purchaseForm.register("qty")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Harga per kg (Rp)</Label>
+                <Input type="number" step="0.01" min="0" className="h-11" placeholder="0" {...purchaseForm.register("pricePerKg")} />
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label>Catatan</Label>

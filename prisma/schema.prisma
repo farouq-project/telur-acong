@@ -126,6 +126,7 @@ model FeedPurchase {
   date          DateTime    @db.Date
   feedProductId String
   qty           Decimal     @db.Decimal(10, 2)
+  pricePerKg    Decimal?    @db.Decimal(12, 2)
   notes         String?     @db.Text
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -143,6 +144,8 @@ model FeedUsage {
   house         String
   feedProductId String
   qtyUsed       Decimal     @db.Decimal(10, 2)
+  unitCost      Decimal?    @db.Decimal(12, 2)
+  totalCost     Decimal?    @db.Decimal(14, 2)
   notes         String?     @db.Text
   productionId  String?     @unique
   createdAt     DateTime    @default(now())

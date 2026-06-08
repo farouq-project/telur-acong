@@ -64,6 +64,8 @@ export interface FeedPurchase {
   feedProductId: string;
   feedProduct?: FeedProduct;
   qty: number;
+  pricePerKg?: number | null;
+  totalValue?: number | null;
   notes?: string | null;
   createdAt: string;
   updatedAt?: string;
@@ -76,6 +78,8 @@ export interface FeedUsage {
   feedProductId: string;
   feedProduct?: FeedProduct;
   qtyUsed: number;
+  unitCost?: number | null;
+  totalCost?: number | null;
   notes?: string | null;
   createdAt: string;
   updatedAt?: string;

@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { decimalToNumber } from "@/lib/utils";
+import { computeFifoFeedCost } from "@/services/feed.service";
 
 export interface CreateProductionInput {
   date: string;
@@ -106,6 +107,15 @@ async function syncProductionFeedUsage(
   const shouldHaveUsage = !!feedProductId && feedQtyKg != null && feedQtyKg > 0;
 
   if (shouldHaveUsage) {
+    const existing = await tx.feedUsage.findUnique({ where: { productionId: production.id } });
+    const { unitCost, totalCost } = await computeFifoFeedCost(tx, {
+      feedProductId: feedProductId!,
+      date: production.date,
+      qtyUsed: feedQtyKg!,
+      createdAt: existing?.createdAt,
+      excludeUsageId: existing?.id,
+    });
+
     await tx.feedUsage.upsert({
       where: { productionId: production.id },
       create: {
@@ -113,6 +123,8 @@ async function syncProductionFeedUsage(
         house: production.house,
         feedProductId: feedProductId!,
         qtyUsed: feedQtyKg!,
+        unitCost,
+        totalCost,
         notes: "Otomatis dari catatan Produksi",
         productionId: production.id,
       },
@@ -121,6 +133,8 @@ async function syncProductionFeedUsage(
         house: production.house,
         feedProductId: feedProductId!,
         qtyUsed: feedQtyKg!,
+        unitCost,
+        totalCost,
       },
     });
   } else {

@@ -17,6 +17,7 @@ export async function PUT(
       date: body.date,
       feedProductId: body.feedProductId,
       qty: body.qty !== undefined ? parseFloat(body.qty) : undefined,
+      pricePerKg: body.pricePerKg !== undefined ? (body.pricePerKg !== "" ? parseFloat(body.pricePerKg) : null) : undefined,
       notes: body.notes,
     });
 
