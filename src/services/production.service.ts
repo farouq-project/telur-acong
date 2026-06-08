@@ -113,6 +113,27 @@ export async function createProduction(input: CreateProductionInput) {
   return serializeRecord(record);
 }
 
+export async function bulkCreateProductions(inputs: CreateProductionInput[]) {
+  const result = await prisma.eggProduction.createMany({
+    data: inputs.map((input) => ({
+      date: new Date(input.date),
+      house: input.house,
+      populasi: input.populasi ?? null,
+      goodEggs: input.goodEggs,
+      crackedEggs: input.crackedEggs,
+      rejectedEggs: input.rejectedEggs,
+      goodEggsKg: input.goodEggsKg ?? null,
+      crackedEggsKg: input.crackedEggsKg ?? null,
+      rejectedEggsKg: input.rejectedEggsKg ?? null,
+      feedQtyKg: input.feedQtyKg ?? null,
+      feedPricePerKg: input.feedPricePerKg ?? null,
+      mortality: input.mortality ?? null,
+      notes: input.notes ?? null,
+    })),
+  });
+  return result.count;
+}
+
 export async function updateProduction(
   id: string,
   input: Partial<CreateProductionInput>

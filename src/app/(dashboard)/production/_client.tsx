@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Search, Edit2, Trash2, Loader2, X } from "lucide-react";
+import * as XLSX from "xlsx";
+import {
+  Plus, Search, Edit2, Trash2, Loader2, X, FileSpreadsheet, Download, Upload,
+} from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { id } from "date-fns/locale";
 import { MobileHeader } from "@/components/layout/MobileHeader";
@@ -18,9 +21,125 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate, formatNumber, todayISO } from "@/lib/utils";
 import type { EggProduction, House } from "@/types";
+
+// ─── Import Excel: kolom template & parsing ──────────────────────────────────
+
+const IMPORT_COLUMNS = [
+  { key: "date", header: "Tanggal (YYYY-MM-DD)" },
+  { key: "house", header: "Kandang" },
+  { key: "goodEggs", header: "Telur Bagus (butir)" },
+  { key: "crackedEggs", header: "Retak (butir)" },
+  { key: "goodEggsKg", header: "Bagus (kg)" },
+  { key: "crackedEggsKg", header: "Retak (kg)" },
+  { key: "feedQtyKg", header: "Pakan (kg)" },
+  { key: "feedPricePerKg", header: "Harga Pakan (Rp per kg)" },
+  { key: "populasi", header: "Populasi (ekor)" },
+  { key: "mortality", header: "Kematian (ekor)" },
+  { key: "notes", header: "Catatan" },
+] as const;
+
+function downloadProductionTemplate() {
+  const headers = IMPORT_COLUMNS.map((c) => c.header);
+  const sample = ["2026-06-01", "Kandang A", 950, 20, 56.5, 1.1, 120, 6500, 5000, 2, "Contoh baris — silakan hapus sebelum import"];
+  const ws = XLSX.utils.aoa_to_sheet([headers, sample]);
+  ws["!cols"] = headers.map(() => ({ wch: 24 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Produksi");
+  XLSX.writeFile(wb, "template-produksi-telur.xlsx");
+}
+
+function parseDateCell(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  if (value instanceof Date && !isNaN(value.getTime())) return format(value, "yyyy-MM-dd");
+  const str = String(value).trim();
+  const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  const parsed = parseISO(str);
+  if (!isNaN(parsed.getTime())) return format(parsed, "yyyy-MM-dd");
+  return null;
+}
+
+function parseNumberCell(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const num = typeof value === "number" ? value : parseFloat(String(value).replace(",", "."));
+  return Number.isNaN(num) ? null : num;
+}
+
+interface ImportRow {
+  rowNum: number;
+  date: string;
+  house: string;
+  goodEggs: number;
+  crackedEggs: number;
+  goodEggsKg: number | null;
+  crackedEggsKg: number | null;
+  feedQtyKg: number | null;
+  feedPricePerKg: number | null;
+  populasi: number | null;
+  mortality: number | null;
+  notes: string | null;
+}
+
+interface ImportError {
+  rowNum: number;
+  message: string;
+}
+
+interface ImportResult {
+  rows: ImportRow[];
+  errors: ImportError[];
+}
+
+function parseImportWorkbook(workbook: XLSX.WorkBook): ImportResult {
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const raw: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+  const headerToKey = new Map(IMPORT_COLUMNS.map((c) => [c.header.trim().toLowerCase(), c.key]));
+
+  const rows: ImportRow[] = [];
+  const errors: ImportError[] = [];
+
+  raw.forEach((rawRow, idx) => {
+    const rowNum = idx + 2;
+    const mapped: Record<string, unknown> = {};
+    for (const [rawHeader, value] of Object.entries(rawRow)) {
+      const key = headerToKey.get(String(rawHeader).trim().toLowerCase());
+      if (key) mapped[key] = value;
+    }
+
+    if (Object.values(mapped).every((v) => v === "" || v == null)) return;
+
+    const date = parseDateCell(mapped.date);
+    const house = mapped.house != null ? String(mapped.house).trim() : "";
+    const goodEggs = parseNumberCell(mapped.goodEggs);
+
+    if (!date) { errors.push({ rowNum, message: "Tanggal tidak valid (gunakan format YYYY-MM-DD)" }); return; }
+    if (!house) { errors.push({ rowNum, message: "Kandang wajib diisi" }); return; }
+    if (goodEggs === null) { errors.push({ rowNum, message: "Telur Bagus (butir) wajib berupa angka" }); return; }
+
+    rows.push({
+      rowNum,
+      date,
+      house,
+      goodEggs,
+      crackedEggs: parseNumberCell(mapped.crackedEggs) ?? 0,
+      goodEggsKg: parseNumberCell(mapped.goodEggsKg),
+      crackedEggsKg: parseNumberCell(mapped.crackedEggsKg),
+      feedQtyKg: parseNumberCell(mapped.feedQtyKg),
+      feedPricePerKg: parseNumberCell(mapped.feedPricePerKg),
+      populasi: parseNumberCell(mapped.populasi),
+      mortality: parseNumberCell(mapped.mortality),
+      notes: mapped.notes != null && String(mapped.notes).trim() !== "" ? String(mapped.notes).trim() : null,
+    });
+  });
+
+  return { rows, errors };
+}
 
 const schema = z.object({
   date: z.string().min(1, "Tanggal wajib diisi"),
@@ -67,6 +186,10 @@ export default function ProductionClient({ initialData, houses }: Props) {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -175,6 +298,48 @@ export default function ProductionClient({ initialData, houses }: Props) {
     }
   }
 
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      const workbook = XLSX.read(buf, { type: "array", cellDates: true });
+      const result = parseImportWorkbook(workbook);
+      if (result.rows.length === 0 && result.errors.length === 0) {
+        toast({ variant: "destructive", title: "File kosong", description: "Tidak ada data yang ditemukan dalam file" });
+        return;
+      }
+      setImportResult(result);
+      setImportOpen(true);
+    } catch {
+      toast({ variant: "destructive", title: "Gagal membaca file", description: "Pastikan file berformat .xlsx sesuai template" });
+    }
+  }
+
+  async function submitImport() {
+    if (!importResult || importResult.rows.length === 0) return;
+    setImporting(true);
+    try {
+      const res = await fetch("/api/v1/production/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: importResult.rows }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+
+      toast({ variant: "success", title: `${json.count} data produksi berhasil diimpor` });
+      setImportOpen(false);
+      setImportResult(null);
+      fetchData();
+    } catch (err) {
+      toast({ variant: "destructive", title: "Gagal impor", description: err instanceof Error ? err.message : "Terjadi kesalahan" });
+    } finally {
+      setImporting(false);
+    }
+  }
+
   const isOwner = session?.user?.role === "OWNER";
 
   const watchedDate = form.watch("date");
@@ -217,19 +382,43 @@ export default function ProductionClient({ initialData, houses }: Props) {
     <>
       <MobileHeader title="Produksi Telur" />
       <div className="px-4 py-4 space-y-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input
-            placeholder="Cari kandang..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-11"
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder="Cari kandang..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 h-11"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2">
+                <X className="w-4 h-4 text-gray-400" />
+              </button>
+            )}
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="h-11 w-11 shrink-0">
+                <FileSpreadsheet className="w-4 h-4 text-gray-500" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={downloadProductionTemplate}>
+                <Download className="w-4 h-4 mr-2" /> Unduh Template Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                <Upload className="w-4 h-4 mr-2" /> Import dari Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={handleImportFile}
           />
-          {search && (
-            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2">
-              <X className="w-4 h-4 text-gray-400" />
-            </button>
-          )}
         </div>
 
         {fetching ? (
@@ -415,6 +604,45 @@ export default function ProductionClient({ initialData, houses }: Props) {
             <Button variant="outline" className="flex-1" onClick={() => setDeleteId(null)}>Batal</Button>
             <Button variant="destructive" className="flex-1" onClick={confirmDelete} disabled={deleting}>
               {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Hapus"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={importOpen} onOpenChange={(o) => { setImportOpen(o); if (!o) setImportResult(null); }}>
+        <DialogContent className="max-w-sm mx-4 max-h-[80vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Pratinjau Import Excel</DialogTitle></DialogHeader>
+          {importResult && (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-600">
+                <span className="font-semibold text-green-700">{importResult.rows.length}</span> baris siap diimpor
+                {importResult.errors.length > 0 && (
+                  <>
+                    {" "}&middot;{" "}
+                    <span className="font-semibold text-red-600">{importResult.errors.length}</span> baris dilewati (error)
+                  </>
+                )}
+              </p>
+              {importResult.errors.length > 0 && (
+                <div className="bg-red-50 rounded-lg p-2.5 max-h-36 overflow-y-auto space-y-1">
+                  {importResult.errors.map((e, i) => (
+                    <p key={i} className="text-xs text-red-600">Baris {e.rowNum}: {e.message}</p>
+                  ))}
+                </div>
+              )}
+              {importResult.rows.length === 0 && (
+                <p className="text-sm text-gray-400">Tidak ada baris valid untuk diimpor.</p>
+              )}
+            </div>
+          )}
+          <DialogFooter className="flex-row gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => { setImportOpen(false); setImportResult(null); }}>Batal</Button>
+            <Button
+              className="flex-1 bg-green-600 hover:bg-green-700"
+              onClick={submitImport}
+              disabled={importing || !importResult || importResult.rows.length === 0}
+            >
+              {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : `Import ${importResult?.rows.length ?? 0} Data`}
             </Button>
           </DialogFooter>
         </DialogContent>
