@@ -29,6 +29,7 @@ export interface EggProduction {
   rejectedEggsKg?: number | null;
   feedQtyKg?: number | null;
   feedPricePerKg?: number | null;
+  feedProductId?: string | null;
   mortality?: number | null;
   notes?: string | null;
   createdAt: string;

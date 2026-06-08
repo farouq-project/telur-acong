@@ -58,12 +58,17 @@ model EggProduction {
   rejectedEggsKg Decimal? @db.Decimal(10, 2)
   feedQtyKg      Decimal? @db.Decimal(10, 2)
   feedPricePerKg Decimal? @db.Decimal(12, 2)
+  feedProductId  String?
   mortality      Int?
   notes          String?  @db.Text
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  feedProduct FeedProduct? @relation(fields: [feedProductId], references: [id], onDelete: SetNull)
+  feedUsage   FeedUsage?
+
   @@index([date])
+  @@index([feedProductId])
   @@map("egg_production")
 }
 
@@ -108,9 +113,10 @@ model FeedProduct {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  purchases FeedPurchase[]
-  usages    FeedUsage[]
-  sales     FeedSale[]
+  purchases  FeedPurchase[]
+  usages     FeedUsage[]
+  sales      FeedSale[]
+  productions EggProduction[]
 
   @@map("feed_products")
 }
@@ -138,10 +144,12 @@ model FeedUsage {
   feedProductId String
   qtyUsed       Decimal     @db.Decimal(10, 2)
   notes         String?     @db.Text
+  productionId  String?     @unique
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  feedProduct FeedProduct @relation(fields: [feedProductId], references: [id], onDelete: Restrict)
+  feedProduct FeedProduct    @relation(fields: [feedProductId], references: [id], onDelete: Restrict)
+  production  EggProduction? @relation(fields: [productionId], references: [id], onDelete: Cascade)
 
   @@index([date])
   @@index([feedProductId])

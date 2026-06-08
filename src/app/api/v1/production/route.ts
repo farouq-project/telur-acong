@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { date, house, populasi, goodEggs, crackedEggs, rejectedEggs,
-            goodEggsKg, crackedEggsKg, rejectedEggsKg, feedQtyKg, feedPricePerKg, mortality, notes } = body;
+            goodEggsKg, crackedEggsKg, rejectedEggsKg, feedQtyKg, feedProductId, mortality, notes } = body;
 
     if (!date || !house || goodEggs === undefined) {
       return NextResponse.json({ error: "Data tidak lengkap" }, { status: 400 });
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       crackedEggsKg: crackedEggsKg != null ? parseFloat(crackedEggsKg) : undefined,
       rejectedEggsKg: rejectedEggsKg != null ? parseFloat(rejectedEggsKg) : undefined,
       feedQtyKg: feedQtyKg != null ? parseFloat(feedQtyKg) : undefined,
-      feedPricePerKg: feedPricePerKg != null ? parseFloat(feedPricePerKg) : undefined,
+      feedProductId: feedProductId != null && feedProductId !== "" ? String(feedProductId) : undefined,
       mortality: mortality != null ? parseInt(mortality) : undefined,
       notes,
     });

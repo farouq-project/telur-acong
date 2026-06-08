@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
         goodEggsKg: row.goodEggsKg != null ? Number(row.goodEggsKg) : undefined,
         crackedEggsKg: row.crackedEggsKg != null ? Number(row.crackedEggsKg) : undefined,
         feedQtyKg: row.feedQtyKg != null ? Number(row.feedQtyKg) : undefined,
-        feedPricePerKg: row.feedPricePerKg != null ? Number(row.feedPricePerKg) : undefined,
+        feedProductId: row.feedProductId != null && row.feedProductId !== "" ? String(row.feedProductId) : undefined,
         mortality: row.mortality != null ? Number(row.mortality) : undefined,
         notes: row.notes != null && row.notes !== "" ? String(row.notes) : undefined,
       };

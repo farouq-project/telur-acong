@@ -26,14 +26,6 @@ const purchaseSchema = z.object({
   notes: z.string().optional(),
 });
 
-const usageSchema = z.object({
-  date: z.string().min(1),
-  house: z.string().min(1, "Kandang wajib diisi"),
-  feedProductId: z.string().min(1, "Pilih produk pakan"),
-  qtyUsed: z.coerce.number().min(0.01),
-  notes: z.string().optional(),
-});
-
 const saleSchema = z.object({
   date: z.string().min(1),
   customerName: z.string().min(1),
@@ -48,7 +40,6 @@ const productSchema = z.object({
 });
 
 type PurchaseForm = z.infer<typeof purchaseSchema>;
-type UsageForm = z.infer<typeof usageSchema>;
 type SaleForm = z.infer<typeof saleSchema>;
 type ProductForm = z.infer<typeof productSchema>;
 
@@ -67,14 +58,13 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
   const [usages, setUsages] = useState<FeedUsage[]>(initialUsages);
   const [feedSales, setFeedSales] = useState<FeedSale[]>(initialFeedSales);
   const [fetching, setFetching] = useState(false);
-  const [activeSheet, setActiveSheet] = useState<"purchase" | "usage" | "sale" | "product" | null>(null);
+  const [activeSheet, setActiveSheet] = useState<"purchase" | "sale" | "product" | null>(null);
   const [chooserOpen, setChooserOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const purchaseForm = useForm<PurchaseForm>({ resolver: zodResolver(purchaseSchema), defaultValues: { date: todayISO(), feedProductId: "", qty: 0, notes: "" } });
-  const usageForm = useForm<UsageForm>({ resolver: zodResolver(usageSchema), defaultValues: { date: todayISO(), house: "", feedProductId: "", qtyUsed: 0, notes: "" } });
   const saleForm = useForm<SaleForm>({ resolver: zodResolver(saleSchema), defaultValues: { date: todayISO(), customerName: "", feedProductId: "", qty: 0, unitPrice: 0 } });
   const productForm = useForm<ProductForm>({ resolver: zodResolver(productSchema), defaultValues: { name: "", unit: "kg" } });
 
@@ -103,19 +93,6 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
       const res = await fetch(url, { method: editingId ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
       if (!res.ok) throw new Error((await res.json()).error);
       toast({ variant: "success", title: "Pembelian disimpan" });
-      setActiveSheet(null);
-      fetchAll();
-    } catch (e) { toast({ variant: "destructive", title: "Gagal", description: String(e) }); }
-    finally { setSubmitting(false); }
-  }
-
-  async function submitUsage(data: UsageForm) {
-    setSubmitting(true);
-    try {
-      const url = editingId ? `/api/v1/feed-usage/${editingId}` : "/api/v1/feed-usage";
-      const res = await fetch(url, { method: editingId ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
-      if (!res.ok) throw new Error((await res.json()).error);
-      toast({ variant: "success", title: "Pemakaian disimpan" });
       setActiveSheet(null);
       fetchAll();
     } catch (e) { toast({ variant: "destructive", title: "Gagal", description: String(e) }); }
@@ -152,7 +129,6 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
     if (!deleteTarget) return;
     const endpoints: Record<string, string> = {
       purchase: `/api/v1/feed-purchases/${deleteTarget.id}`,
-      usage: `/api/v1/feed-usage/${deleteTarget.id}`,
       sale: `/api/v1/feed-sales/${deleteTarget.id}`,
       product: `/api/v1/feed-products/${deleteTarget.id}`,
     };
@@ -168,12 +144,6 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
     purchaseForm.reset(record ? { date: record.date.split("T")[0], feedProductId: record.feedProductId, qty: record.qty, notes: record.notes ?? "" } : { date: todayISO(), feedProductId: "", qty: 0, notes: "" });
     setEditingId(record?.id ?? null);
     setActiveSheet("purchase");
-  }
-
-  function openUsage(record?: FeedUsage) {
-    usageForm.reset(record ? { date: record.date.split("T")[0], house: record.house, feedProductId: record.feedProductId, qtyUsed: record.qtyUsed, notes: record.notes ?? "" } : { date: todayISO(), house: "", feedProductId: "", qtyUsed: 0, notes: "" });
-    setEditingId(record?.id ?? null);
-    setActiveSheet("usage");
   }
 
   function openSale(record?: FeedSale) {
@@ -220,6 +190,7 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
           </TabsContent>
 
           <TabsContent value="usage" className="space-y-2">
+            <p className="text-xs text-gray-400 px-1">Pemakaian terisi otomatis dari catatan Produksi Telur — tab ini hanya untuk pemantauan.</p>
             {fetching ? <div className="h-20 rounded-xl bg-gray-100 animate-pulse" /> :
               usages.length === 0 ? <Empty label="Belum ada pemakaian pakan" /> :
               usages.map((r) => (
@@ -231,8 +202,6 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
                   qty={`${formatNumber(r.qtyUsed)} ${(r.feedProduct as FeedProduct)?.unit ?? "kg"}`}
                   detail={`Kandang ${r.house}`}
                   date={r.date}
-                  onEdit={() => openUsage(r)}
-                  onDelete={() => setDeleteTarget({ id: r.id, type: "usage" })}
                   isOwner={isOwner}
                 />
               ))}
@@ -296,13 +265,6 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
               onClick={() => { setChooserOpen(false); openPurchase(); }}
             />
             <ChooserOption
-              icon={<Wheat className="w-5 h-5" />}
-              accent="amber"
-              title="Pemakaian"
-              description="Catat pakan yang digunakan di kandang"
-              onClick={() => { setChooserOpen(false); openUsage(); }}
-            />
-            <ChooserOption
               icon={<ShoppingCart className="w-5 h-5" />}
               accent="purple"
               title="Penjualan"
@@ -335,36 +297,6 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
             <div className="space-y-1.5">
               <Label>Catatan</Label>
               <Textarea rows={2} {...purchaseForm.register("notes")} />
-            </div>
-            <FormActions submitting={submitting} onCancel={() => setActiveSheet(null)} editingId={editingId} />
-          </form>
-        </SheetContent>
-      </Sheet>
-
-      <Sheet open={activeSheet === "usage"} onOpenChange={(o) => !o && setActiveSheet(null)}>
-        <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto rounded-t-2xl">
-          <SheetHeader className="mb-4"><SheetTitle>{editingId ? "Edit Pemakaian" : "Catat Pemakaian"}</SheetTitle></SheetHeader>
-          <form onSubmit={usageForm.handleSubmit(submitUsage)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Tanggal</Label>
-                <Input type="date" className="h-11" {...usageForm.register("date")} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Kandang</Label>
-                <Input className="h-11" placeholder="Kandang A" {...usageForm.register("house")} />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Produk Pakan</Label>
-              <Select onValueChange={(v) => usageForm.setValue("feedProductId", v)} value={usageForm.watch("feedProductId")}>
-                <SelectTrigger className="h-11"><SelectValue placeholder="Pilih produk" /></SelectTrigger>
-                <SelectContent>{products.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Jumlah Dipakai</Label>
-              <Input type="number" step="0.01" className="h-11" {...usageForm.register("qtyUsed")} />
             </div>
             <FormActions submitting={submitting} onCancel={() => setActiveSheet(null)} editingId={editingId} />
           </form>
@@ -446,7 +378,7 @@ const ACCENT_STYLES: Record<string, { bg: string; text: string; border: string }
 function FeedRow({ icon, accent, label, title, qty, detail, date, onEdit, onDelete, isOwner }: {
   icon: React.ReactNode; accent: "green" | "amber" | "purple"; label: string;
   title: string; qty: string; detail?: string; date: string;
-  onEdit: () => void; onDelete: () => void; isOwner: boolean;
+  onEdit?: () => void; onDelete?: () => void; isOwner: boolean;
 }) {
   const a = ACCENT_STYLES[accent];
   return (
@@ -465,10 +397,12 @@ function FeedRow({ icon, accent, label, title, qty, detail, date, onEdit, onDele
           {detail && <p className="text-xs text-gray-400 truncate shrink-0">{detail}</p>}
         </div>
       </div>
-      <div className="flex flex-col gap-0.5 shrink-0">
-        <button onClick={onEdit} className="p-1.5 rounded-lg hover:bg-gray-100"><Edit2 className="w-3.5 h-3.5 text-gray-400" /></button>
-        {isOwner && <button onClick={onDelete} className="p-1.5 rounded-lg hover:bg-red-50"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>}
-      </div>
+      {(onEdit || onDelete) && (
+        <div className="flex flex-col gap-0.5 shrink-0">
+          {onEdit && <button onClick={onEdit} className="p-1.5 rounded-lg hover:bg-gray-100"><Edit2 className="w-3.5 h-3.5 text-gray-400" /></button>}
+          {onDelete && isOwner && <button onClick={onDelete} className="p-1.5 rounded-lg hover:bg-red-50"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>}
+        </div>
+      )}
     </div>
   );
 }

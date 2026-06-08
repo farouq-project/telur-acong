@@ -13,6 +13,7 @@ export interface CreateProductionInput {
   rejectedEggsKg?: number;
   feedQtyKg?: number;
   feedPricePerKg?: number;
+  feedProductId?: string;
   mortality?: number;
   notes?: string;
 }
@@ -30,6 +31,7 @@ function serializeRecord(r: {
   rejectedEggsKg: unknown;
   feedQtyKg: unknown;
   feedPricePerKg: unknown;
+  feedProductId: string | null;
   mortality: number | null;
   notes: string | null;
   createdAt: Date;
@@ -92,74 +94,134 @@ export async function getProductionById(id: string) {
   return serializeRecord(record);
 }
 
+// Sinkronkan catatan FeedUsage yang terhubung ke produksi: dibuat/diperbarui/dihapus
+// otomatis mengikuti Jenis Pakan + Pakan (kg) pada form Produksi, agar Stok Pakan
+// (yang menjumlahkan FeedProduct.usages) selalu mencerminkan konsumsi dari Produksi.
+async function syncProductionFeedUsage(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  production: { id: string; date: Date; house: string },
+  feedProductId?: string | null,
+  feedQtyKg?: number | null
+) {
+  const shouldHaveUsage = !!feedProductId && feedQtyKg != null && feedQtyKg > 0;
+
+  if (shouldHaveUsage) {
+    await tx.feedUsage.upsert({
+      where: { productionId: production.id },
+      create: {
+        date: production.date,
+        house: production.house,
+        feedProductId: feedProductId!,
+        qtyUsed: feedQtyKg!,
+        notes: "Otomatis dari catatan Produksi",
+        productionId: production.id,
+      },
+      update: {
+        date: production.date,
+        house: production.house,
+        feedProductId: feedProductId!,
+        qtyUsed: feedQtyKg!,
+      },
+    });
+  } else {
+    await tx.feedUsage.deleteMany({ where: { productionId: production.id } });
+  }
+}
+
 export async function createProduction(input: CreateProductionInput) {
-  const record = await prisma.eggProduction.create({
-    data: {
-      date: new Date(input.date),
-      house: input.house,
-      populasi: input.populasi ?? null,
-      goodEggs: input.goodEggs,
-      crackedEggs: input.crackedEggs,
-      rejectedEggs: input.rejectedEggs,
-      goodEggsKg: input.goodEggsKg ?? null,
-      crackedEggsKg: input.crackedEggsKg ?? null,
-      rejectedEggsKg: input.rejectedEggsKg ?? null,
-      feedQtyKg: input.feedQtyKg ?? null,
-      feedPricePerKg: input.feedPricePerKg ?? null,
-      mortality: input.mortality ?? null,
-      notes: input.notes,
-    },
+  return prisma.$transaction(async (tx) => {
+    const record = await tx.eggProduction.create({
+      data: {
+        date: new Date(input.date),
+        house: input.house,
+        populasi: input.populasi ?? null,
+        goodEggs: input.goodEggs,
+        crackedEggs: input.crackedEggs,
+        rejectedEggs: input.rejectedEggs,
+        goodEggsKg: input.goodEggsKg ?? null,
+        crackedEggsKg: input.crackedEggsKg ?? null,
+        rejectedEggsKg: input.rejectedEggsKg ?? null,
+        feedQtyKg: input.feedQtyKg ?? null,
+        feedPricePerKg: input.feedPricePerKg ?? null,
+        feedProductId: input.feedProductId ?? null,
+        mortality: input.mortality ?? null,
+        notes: input.notes,
+      },
+    });
+
+    await syncProductionFeedUsage(tx, record, input.feedProductId, input.feedQtyKg);
+
+    return serializeRecord(record);
   });
-  return serializeRecord(record);
 }
 
 export async function bulkCreateProductions(inputs: CreateProductionInput[]) {
-  const result = await prisma.eggProduction.createMany({
-    data: inputs.map((input) => ({
-      date: new Date(input.date),
-      house: input.house,
-      populasi: input.populasi ?? null,
-      goodEggs: input.goodEggs,
-      crackedEggs: input.crackedEggs,
-      rejectedEggs: input.rejectedEggs,
-      goodEggsKg: input.goodEggsKg ?? null,
-      crackedEggsKg: input.crackedEggsKg ?? null,
-      rejectedEggsKg: input.rejectedEggsKg ?? null,
-      feedQtyKg: input.feedQtyKg ?? null,
-      feedPricePerKg: input.feedPricePerKg ?? null,
-      mortality: input.mortality ?? null,
-      notes: input.notes ?? null,
-    })),
-  });
-  return result.count;
+  let count = 0;
+  for (const input of inputs) {
+    await prisma.$transaction(async (tx) => {
+      const record = await tx.eggProduction.create({
+        data: {
+          date: new Date(input.date),
+          house: input.house,
+          populasi: input.populasi ?? null,
+          goodEggs: input.goodEggs,
+          crackedEggs: input.crackedEggs,
+          rejectedEggs: input.rejectedEggs,
+          goodEggsKg: input.goodEggsKg ?? null,
+          crackedEggsKg: input.crackedEggsKg ?? null,
+          rejectedEggsKg: input.rejectedEggsKg ?? null,
+          feedQtyKg: input.feedQtyKg ?? null,
+          feedPricePerKg: input.feedPricePerKg ?? null,
+          feedProductId: input.feedProductId ?? null,
+          mortality: input.mortality ?? null,
+          notes: input.notes ?? null,
+        },
+      });
+
+      await syncProductionFeedUsage(tx, record, input.feedProductId, input.feedQtyKg);
+    });
+    count += 1;
+  }
+  return count;
 }
 
 export async function updateProduction(
   id: string,
   input: Partial<CreateProductionInput>
 ) {
-  const record = await prisma.eggProduction.update({
-    where: { id },
-    data: {
-      ...(input.date && { date: new Date(input.date) }),
-      ...(input.house !== undefined && { house: input.house }),
-      ...(input.populasi !== undefined && { populasi: input.populasi }),
-      ...(input.goodEggs !== undefined && { goodEggs: input.goodEggs }),
-      ...(input.crackedEggs !== undefined && { crackedEggs: input.crackedEggs }),
-      ...(input.rejectedEggs !== undefined && { rejectedEggs: input.rejectedEggs }),
-      ...(input.goodEggsKg !== undefined && { goodEggsKg: input.goodEggsKg }),
-      ...(input.crackedEggsKg !== undefined && { crackedEggsKg: input.crackedEggsKg }),
-      ...(input.rejectedEggsKg !== undefined && { rejectedEggsKg: input.rejectedEggsKg }),
-      ...(input.feedQtyKg !== undefined && { feedQtyKg: input.feedQtyKg }),
-      ...(input.feedPricePerKg !== undefined && { feedPricePerKg: input.feedPricePerKg }),
-      ...(input.mortality !== undefined && { mortality: input.mortality }),
-      ...(input.notes !== undefined && { notes: input.notes }),
-    },
+  return prisma.$transaction(async (tx) => {
+    const record = await tx.eggProduction.update({
+      where: { id },
+      data: {
+        ...(input.date && { date: new Date(input.date) }),
+        ...(input.house !== undefined && { house: input.house }),
+        ...(input.populasi !== undefined && { populasi: input.populasi }),
+        ...(input.goodEggs !== undefined && { goodEggs: input.goodEggs }),
+        ...(input.crackedEggs !== undefined && { crackedEggs: input.crackedEggs }),
+        ...(input.rejectedEggs !== undefined && { rejectedEggs: input.rejectedEggs }),
+        ...(input.goodEggsKg !== undefined && { goodEggsKg: input.goodEggsKg }),
+        ...(input.crackedEggsKg !== undefined && { crackedEggsKg: input.crackedEggsKg }),
+        ...(input.rejectedEggsKg !== undefined && { rejectedEggsKg: input.rejectedEggsKg }),
+        ...(input.feedQtyKg !== undefined && { feedQtyKg: input.feedQtyKg }),
+        ...(input.feedPricePerKg !== undefined && { feedPricePerKg: input.feedPricePerKg }),
+        ...(input.feedProductId !== undefined && { feedProductId: input.feedProductId }),
+        ...(input.mortality !== undefined && { mortality: input.mortality }),
+        ...(input.notes !== undefined && { notes: input.notes }),
+      },
+    });
+
+    if (input.feedProductId !== undefined || input.feedQtyKg !== undefined) {
+      const feedProductId = input.feedProductId !== undefined ? input.feedProductId : record.feedProductId;
+      const feedQtyKg = input.feedQtyKg !== undefined ? input.feedQtyKg : decimalToNumber(record.feedQtyKg);
+      await syncProductionFeedUsage(tx, record, feedProductId, feedQtyKg);
+    }
+
+    return serializeRecord(record);
   });
-  return serializeRecord(record);
 }
 
 export async function deleteProduction(id: string) {
+  // FeedUsage terhubung dihapus otomatis lewat onDelete: Cascade pada relasi productionId
   await prisma.eggProduction.delete({ where: { id } });
 }
 

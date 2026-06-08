@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate, formatNumber, todayISO } from "@/lib/utils";
-import type { EggProduction, House } from "@/types";
+import type { EggProduction, House, FeedProduct } from "@/types";
 
 // ─── Import Excel: kolom template & parsing ──────────────────────────────────
 
@@ -38,15 +38,16 @@ const IMPORT_COLUMNS = [
   { key: "goodEggsKg", header: "Bagus (kg)" },
   { key: "crackedEggsKg", header: "Retak (kg)" },
   { key: "feedQtyKg", header: "Pakan (kg)" },
-  { key: "feedPricePerKg", header: "Harga Pakan (Rp per kg)" },
+  { key: "feedProduct", header: "Jenis Pakan" },
   { key: "populasi", header: "Populasi (ekor)" },
   { key: "mortality", header: "Kematian (ekor)" },
   { key: "notes", header: "Catatan" },
 ] as const;
 
-function downloadProductionTemplate() {
+function downloadProductionTemplate(feedProducts: FeedProduct[]) {
   const headers = IMPORT_COLUMNS.map((c) => c.header);
-  const sample = ["2026-06-01", "Kandang A", 950, 20, 56.5, 1.1, 120, 6500, 5000, 2, "Contoh baris — silakan hapus sebelum import"];
+  const sampleFeedProduct = feedProducts[0]?.name ?? "Konsentrat A";
+  const sample = ["2026-06-01", "Kandang A", 950, 20, 56.5, 1.1, 120, sampleFeedProduct, 5000, 2, "Contoh baris — silakan hapus sebelum import"];
   const ws = XLSX.utils.aoa_to_sheet([headers, sample]);
   ws["!cols"] = headers.map(() => ({ wch: 24 }));
   const wb = XLSX.utils.book_new();
@@ -80,7 +81,8 @@ interface ImportRow {
   goodEggsKg: number | null;
   crackedEggsKg: number | null;
   feedQtyKg: number | null;
-  feedPricePerKg: number | null;
+  feedProductName: string | null;
+  feedProductId: string | null;
   populasi: number | null;
   mortality: number | null;
   notes: string | null;
@@ -96,7 +98,7 @@ interface ImportResult {
   errors: ImportError[];
 }
 
-function parseImportWorkbook(workbook: XLSX.WorkBook): ImportResult {
+function parseImportWorkbook(workbook: XLSX.WorkBook, feedProducts: FeedProduct[]): ImportResult {
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const raw: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
   const headerToKey = new Map(IMPORT_COLUMNS.map((c) => [c.header.trim().toLowerCase(), c.key]));
@@ -122,6 +124,16 @@ function parseImportWorkbook(workbook: XLSX.WorkBook): ImportResult {
     if (!house) { errors.push({ rowNum, message: "Kandang wajib diisi" }); return; }
     if (goodEggs === null) { errors.push({ rowNum, message: "Telur Bagus (butir) wajib berupa angka" }); return; }
 
+    const feedProductName = mapped.feedProduct != null && String(mapped.feedProduct).trim() !== ""
+      ? String(mapped.feedProduct).trim()
+      : null;
+    let feedProductId: string | null = null;
+    if (feedProductName) {
+      const match = feedProducts.find((p) => p.name.trim().toLowerCase() === feedProductName.trim().toLowerCase());
+      if (!match) { errors.push({ rowNum, message: `Jenis Pakan "${feedProductName}" tidak ditemukan di daftar Produk Pakan` }); return; }
+      feedProductId = match.id;
+    }
+
     rows.push({
       rowNum,
       date,
@@ -131,7 +143,8 @@ function parseImportWorkbook(workbook: XLSX.WorkBook): ImportResult {
       goodEggsKg: parseNumberCell(mapped.goodEggsKg),
       crackedEggsKg: parseNumberCell(mapped.crackedEggsKg),
       feedQtyKg: parseNumberCell(mapped.feedQtyKg),
-      feedPricePerKg: parseNumberCell(mapped.feedPricePerKg),
+      feedProductName,
+      feedProductId,
       populasi: parseNumberCell(mapped.populasi),
       mortality: parseNumberCell(mapped.mortality),
       notes: mapped.notes != null && String(mapped.notes).trim() !== "" ? String(mapped.notes).trim() : null,
@@ -150,7 +163,7 @@ const schema = z.object({
   goodEggsKg: z.coerce.number().min(0).optional().or(z.literal("")),
   crackedEggsKg: z.coerce.number().min(0).optional().or(z.literal("")),
   feedQtyKg: z.coerce.number().min(0).optional().or(z.literal("")),
-  feedPricePerKg: z.coerce.number().min(0).optional().or(z.literal("")),
+  feedProductId: z.string().optional().or(z.literal("")),
   mortality: z.coerce.number().min(0).optional().or(z.literal("")),
   notes: z.string().optional(),
 });
@@ -160,6 +173,7 @@ type FormData = z.infer<typeof schema>;
 interface Props {
   initialData: EggProduction[];
   houses: House[];
+  feedProducts: FeedProduct[];
 }
 
 function computeMetrics(r: EggProduction) {
@@ -175,7 +189,7 @@ function computeMetrics(r: EggProduction) {
   return { hd, feedIntake, fcr, hpp };
 }
 
-export default function ProductionClient({ initialData, houses }: Props) {
+export default function ProductionClient({ initialData, houses, feedProducts }: Props) {
   const { data: session } = useSession();
   const { toast } = useToast();
   const [records, setRecords] = useState<EggProduction[]>(initialData);
@@ -196,7 +210,7 @@ export default function ProductionClient({ initialData, houses }: Props) {
     defaultValues: {
       date: todayISO(), house: "", goodEggs: 0, crackedEggs: 0,
       populasi: "", goodEggsKg: "", crackedEggsKg: "",
-      feedQtyKg: "", feedPricePerKg: "", mortality: "", notes: "",
+      feedQtyKg: "", feedProductId: "", mortality: "", notes: "",
     },
   });
 
@@ -222,7 +236,7 @@ export default function ProductionClient({ initialData, houses }: Props) {
   const defaultValues = {
     date: todayISO(), house: "", goodEggs: 0, crackedEggs: 0,
     populasi: "" as const, goodEggsKg: "" as const, crackedEggsKg: "" as const,
-    feedQtyKg: "" as const, feedPricePerKg: "" as const,
+    feedQtyKg: "" as const, feedProductId: "" as const,
     mortality: "" as const, notes: "",
   };
 
@@ -242,7 +256,7 @@ export default function ProductionClient({ initialData, houses }: Props) {
       goodEggsKg: record.goodEggsKg ?? "",
       crackedEggsKg: record.crackedEggsKg ?? "",
       feedQtyKg: record.feedQtyKg ?? "",
-      feedPricePerKg: record.feedPricePerKg ?? "",
+      feedProductId: record.feedProductId ?? "",
       mortality: record.mortality ?? "",
       notes: record.notes ?? "",
     });
@@ -261,7 +275,7 @@ export default function ProductionClient({ initialData, houses }: Props) {
         goodEggsKg: data.goodEggsKg !== "" ? data.goodEggsKg : null,
         crackedEggsKg: data.crackedEggsKg !== "" ? data.crackedEggsKg : null,
         feedQtyKg: data.feedQtyKg !== "" ? data.feedQtyKg : null,
-        feedPricePerKg: data.feedPricePerKg !== "" ? data.feedPricePerKg : null,
+        feedProductId: data.feedProductId !== "" ? data.feedProductId : null,
         mortality: data.mortality !== "" ? data.mortality : null,
       };
       const res = await fetch(url, {
@@ -305,7 +319,7 @@ export default function ProductionClient({ initialData, houses }: Props) {
     try {
       const buf = await file.arrayBuffer();
       const workbook = XLSX.read(buf, { type: "array", cellDates: true });
-      const result = parseImportWorkbook(workbook);
+      const result = parseImportWorkbook(workbook, feedProducts);
       if (result.rows.length === 0 && result.errors.length === 0) {
         toast({ variant: "destructive", title: "File kosong", description: "Tidak ada data yang ditemukan dalam file" });
         return;
@@ -404,7 +418,7 @@ export default function ProductionClient({ initialData, houses }: Props) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={downloadProductionTemplate}>
+              <DropdownMenuItem onClick={() => downloadProductionTemplate(feedProducts)}>
                 <Download className="w-4 h-4 mr-2" /> Unduh Template Excel
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
@@ -575,8 +589,16 @@ export default function ProductionClient({ initialData, houses }: Props) {
                   <Input type="number" min="0" step="0.01" className="h-11" placeholder="0.00" {...form.register("feedQtyKg")} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Harga Pakan (Rp/kg)</Label>
-                  <Input type="number" min="0" className="h-11" placeholder="0" {...form.register("feedPricePerKg")} />
+                  <Label className="text-xs">Jenis Pakan</Label>
+                  <Select onValueChange={(v) => form.setValue("feedProductId", v)} value={form.watch("feedProductId")}>
+                    <SelectTrigger className="h-11"><SelectValue placeholder="Pilih jenis pakan" /></SelectTrigger>
+                    <SelectContent>
+                      {feedProducts.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-400">Akan mengurangi Stok Pakan otomatis</p>
                 </div>
               </div>
             </div>

@@ -43,7 +43,7 @@ export async function PUT(
       crackedEggsKg: body.crackedEggsKg != null ? parseFloat(body.crackedEggsKg) : undefined,
       rejectedEggsKg: body.rejectedEggsKg != null ? parseFloat(body.rejectedEggsKg) : undefined,
       feedQtyKg: body.feedQtyKg != null ? parseFloat(body.feedQtyKg) : undefined,
-      feedPricePerKg: body.feedPricePerKg != null ? parseFloat(body.feedPricePerKg) : undefined,
+      feedProductId: body.feedProductId !== undefined ? (body.feedProductId || null) : undefined,
       mortality: body.mortality != null ? parseInt(body.mortality) : undefined,
       notes: body.notes,
     });
