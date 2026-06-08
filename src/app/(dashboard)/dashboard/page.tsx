@@ -143,10 +143,11 @@ export default async function DashboardPage() {
         {/* Charts — client component, owner only */}
         {isOwner && (
           <DashboardCharts
-            productionTrend={stats.productionTrend}
+            productionByHouse={stats.productionByHouse}
             salesTrend={stats.salesTrend}
             mortalityTrend={stats.mortalityTrend}
             dailyMetrics={stats.dailyMetrics}
+            houses={stats.houseNames}
           />
         )}
 

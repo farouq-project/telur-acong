@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import * as XLSX from "xlsx";
 import {
-  Plus, Search, Edit2, Trash2, Loader2, X, FileSpreadsheet, Download, Upload,
+  Plus, Search, Edit2, Trash2, Loader2, X, FileSpreadsheet, Download, Upload, ListFilter, ArrowUpDown,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { id } from "date-fns/locale";
@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate, formatNumber, todayISO } from "@/lib/utils";
@@ -203,7 +204,15 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [filterHouses, setFilterHouses] = useState<string[]>([]);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function toggleFilterHouse(name: string) {
+    setFilterHouses((prev) => (prev.includes(name) ? prev.filter((h) => h !== name) : [...prev, name]));
+  }
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -219,19 +228,33 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
     try {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
+      if (dateFrom) params.set("from", dateFrom);
+      if (dateTo) params.set("to", dateTo);
       const res = await fetch(`/api/v1/production?${params}`);
       const json = await res.json();
       setRecords(json.data ?? []);
     } finally {
       setFetching(false);
     }
-  }, [search]);
+  }, [search, dateFrom, dateTo]);
 
   useEffect(() => {
-    if (search !== "") fetchData();
+    if (search !== "" || dateFrom !== "" || dateTo !== "") fetchData();
     else if (records !== initialData) fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
+  }, [search, dateFrom, dateTo]);
+
+  const displayRecords = useMemo(() => {
+    const filtered = filterHouses.length > 0
+      ? records.filter((r) => filterHouses.includes(r.house))
+      : records;
+
+    return [...filtered].sort((a, b) =>
+      sortDir === "asc"
+        ? new Date(a.date).getTime() - new Date(b.date).getTime()
+        : new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  }, [records, filterHouses, sortDir]);
 
   const defaultValues = {
     date: todayISO(), house: "", goodEggs: 0, crackedEggs: 0,
@@ -435,6 +458,73 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
           />
         </div>
 
+        <div className="flex flex-wrap items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs">
+                <ListFilter className="w-3.5 h-3.5" />
+                {filterHouses.length === 0
+                  ? "Semua Kandang"
+                  : filterHouses.length === 1
+                    ? filterHouses[0]
+                    : `${filterHouses.length} Kandang`}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuLabel>Filter Kandang</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {houses.map((h) => (
+                <DropdownMenuCheckboxItem
+                  key={h.id}
+                  checked={filterHouses.includes(h.name)}
+                  onCheckedChange={() => toggleFilterHouse(h.name)}
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  {h.name}
+                </DropdownMenuCheckboxItem>
+              ))}
+              {filterHouses.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setFilterHouses([])}>Reset filter kandang</DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="h-9 w-[130px] text-xs px-2"
+          />
+          <span className="text-xs text-gray-400">–</span>
+          <Input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="h-9 w-[130px] text-xs px-2"
+          />
+          {(dateFrom || dateTo) && (
+            <button
+              onClick={() => { setDateFrom(""); setDateTo(""); }}
+              className="text-xs text-gray-400 underline shrink-0"
+            >
+              Reset tanggal
+            </button>
+          )}
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5 text-xs ml-auto shrink-0"
+            onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+          >
+            <ArrowUpDown className="w-3.5 h-3.5" />
+            {sortDir === "asc" ? "Tanggal Terlama" : "Tanggal Terbaru"}
+          </Button>
+        </div>
+
         {fetching ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)}
@@ -444,9 +534,14 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
             <p className="text-4xl mb-2">🥚</p>
             <p className="text-sm">Belum ada data produksi</p>
           </div>
+        ) : displayRecords.length === 0 ? (
+          <div className="text-center py-16 text-gray-400">
+            <p className="text-4xl mb-2">🔍</p>
+            <p className="text-sm">Tidak ada data yang cocok dengan filter</p>
+          </div>
         ) : (
           <div className="space-y-2">
-            {records.map((r) => {
+            {displayRecords.map((r) => {
               const { hd, feedIntake, fcr, hpp } = computeMetrics(r);
               return (
                 <div key={r.id} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">

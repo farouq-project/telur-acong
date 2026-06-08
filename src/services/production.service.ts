@@ -291,6 +291,28 @@ export async function getProductionTrend(days = 30) {
   return Object.entries(grouped).map(([date, value]) => ({ date, value }));
 }
 
+export async function getProductionTrendByHouse(days = 90) {
+  const from = new Date();
+  from.setDate(from.getDate() - days);
+  from.setHours(0, 0, 0, 0);
+
+  const records = await prisma.eggProduction.findMany({
+    where: { date: { gte: from } },
+    select: { date: true, house: true, goodEggs: true },
+    orderBy: { date: "asc" },
+  });
+
+  const grouped: Record<string, { date: string; house: string; value: number }> = {};
+  records.forEach((r) => {
+    const dateKey = r.date.toISOString().split("T")[0];
+    const key = `${dateKey}__${r.house}`;
+    if (!grouped[key]) grouped[key] = { date: dateKey, house: r.house, value: 0 };
+    grouped[key].value += r.goodEggs;
+  });
+
+  return Object.values(grouped);
+}
+
 export interface DailyMetric {
   id: string;
   date: string;
