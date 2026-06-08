@@ -229,38 +229,40 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
     },
   });
 
+  const hasActiveFilter = search !== "" || filterHouses.length > 0 || dateFrom !== "" || dateTo !== "";
+
   const fetchData = useCallback(async () => {
     setFetching(true);
     try {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
+      if (filterHouses.length > 0) params.set("houses", filterHouses.join(","));
       if (dateFrom) params.set("from", dateFrom);
       if (dateTo) params.set("to", dateTo);
+      // Saat ada filter aktif, ambil seluruh data yang cocok (bukan hanya 50 terbaru)
+      // agar pemfilteran benar-benar mencakup semua data, bukan hanya halaman pertama.
+      params.set("limit", hasActiveFilter ? "5000" : "50");
       const res = await fetch(`/api/v1/production?${params}`);
       const json = await res.json();
       setRecords(json.data ?? []);
     } finally {
       setFetching(false);
     }
-  }, [search, dateFrom, dateTo]);
+  }, [search, filterHouses, dateFrom, dateTo, hasActiveFilter]);
 
   useEffect(() => {
-    if (search !== "" || dateFrom !== "" || dateTo !== "") fetchData();
+    if (hasActiveFilter) fetchData();
     else if (records !== initialData) fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, dateFrom, dateTo]);
+  }, [search, filterHouses, dateFrom, dateTo]);
 
   const displayRecords = useMemo(() => {
-    const filtered = filterHouses.length > 0
-      ? records.filter((r) => filterHouses.includes(r.house))
-      : records;
-
-    return [...filtered].sort((a, b) =>
+    return [...records].sort((a, b) =>
       sortDir === "asc"
         ? new Date(a.date).getTime() - new Date(b.date).getTime()
         : new Date(b.date).getTime() - new Date(a.date).getTime()
     );
-  }, [records, filterHouses, sortDir]);
+  }, [records, sortDir]);
 
   const defaultValues = {
     date: todayISO(), house: "", goodEggs: 0, crackedEggs: 0,

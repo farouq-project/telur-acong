@@ -53,12 +53,13 @@ function serializeRecord(r: {
 
 export async function getProductions(params?: {
   search?: string;
+  houses?: string[];
   from?: string;
   to?: string;
   limit?: number;
   offset?: number;
 }) {
-  const { search, from, to, limit = 50, offset = 0 } = params ?? {};
+  const { search, houses, from, to, limit = 50, offset = 0 } = params ?? {};
 
   const where: Record<string, unknown> = {};
 
@@ -69,7 +70,9 @@ export async function getProductions(params?: {
     };
   }
 
-  if (search) {
+  if (houses && houses.length > 0) {
+    where.house = { in: houses };
+  } else if (search) {
     where.house = { contains: search };
   }
 
@@ -357,13 +360,8 @@ export interface DailyMetric {
 // - FCR = Pakan (kg) / Total Produksi Telur (kg) [Bagus + Retak] — rasio desimal
 // - HD  = Total Butir [Bagus + Retak] / Sisa Populasi [Populasi - Kematian] — persentase
 // - FI  = Pakan (kg) / Sisa Populasi [Populasi - Kematian] — rasio desimal
-export async function getDailyMetrics(days = 14) {
-  const from = new Date();
-  from.setDate(from.getDate() - days);
-  from.setHours(0, 0, 0, 0);
-
+export async function getDailyMetrics() {
   const records = await prisma.eggProduction.findMany({
-    where: { date: { gte: from } },
     select: {
       id: true,
       date: true,

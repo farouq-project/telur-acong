@@ -36,7 +36,7 @@ export async function getDashboardStats() {
     getSalesTrend(30),
     getMortalityTrend(30),
     getFeedStock(),
-    getDailyMetrics(90),
+    getDailyMetrics(),
     getHouses(),
   ]);
 

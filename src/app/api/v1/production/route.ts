@@ -9,8 +9,10 @@ export async function GET(request: NextRequest) {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { searchParams } = new URL(request.url);
+    const housesParam = searchParams.get("houses");
     const result = await getProductions({
       search: searchParams.get("search") ?? undefined,
+      houses: housesParam ? housesParam.split(",").map((h) => h.trim()).filter(Boolean) : undefined,
       from: searchParams.get("from") ?? undefined,
       to: searchParams.get("to") ?? undefined,
       limit: parseInt(searchParams.get("limit") ?? "50"),
