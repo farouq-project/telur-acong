@@ -8,6 +8,7 @@ import { z } from "zod";
 import * as XLSX from "xlsx";
 import {
   Plus, Search, Edit2, Trash2, Loader2, X, FileSpreadsheet, Download, Upload, ListFilter, ArrowUpDown,
+  ListChecks, CheckSquare, Square,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { id } from "date-fns/locale";
@@ -204,10 +205,15 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null);
   const [filterHouses, setFilterHouses] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function toggleFilterHouse(name: string) {
@@ -335,6 +341,47 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
     }
   }
 
+  function toggleSelectMode() {
+    setSelectMode((prev) => {
+      if (prev) setSelectedIds([]);
+      return !prev;
+    });
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function selectAllVisible() {
+    setSelectedIds((prev) =>
+      prev.length === displayRecords.length ? [] : displayRecords.map((r) => r.id)
+    );
+  }
+
+  async function confirmBulkDelete() {
+    if (selectedIds.length === 0) return;
+    setBulkDeleting(true);
+    try {
+      const res = await fetch("/api/v1/production/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedIds }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+
+      toast({ variant: "success", title: `${json.count} data produksi dihapus` });
+      setBulkDeleteOpen(false);
+      setSelectedIds([]);
+      setSelectMode(false);
+      fetchData();
+    } catch (err) {
+      toast({ variant: "destructive", title: "Gagal", description: err instanceof Error ? err.message : "Terjadi kesalahan" });
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -356,24 +403,41 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
 
   async function submitImport() {
     if (!importResult || importResult.rows.length === 0) return;
+    const IMPORT_CHUNK_SIZE = 150;
+    const total = importResult.rows.length;
     setImporting(true);
+    setImportProgress({ done: 0, total });
+    let imported = 0;
     try {
-      const res = await fetch("/api/v1/production/bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: importResult.rows }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error);
+      for (let i = 0; i < total; i += IMPORT_CHUNK_SIZE) {
+        const chunk = importResult.rows.slice(i, i + IMPORT_CHUNK_SIZE);
+        const res = await fetch("/api/v1/production/bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rows: chunk }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error);
+        imported += json.count ?? chunk.length;
+        setImportProgress({ done: Math.min(i + chunk.length, total), total });
+      }
 
-      toast({ variant: "success", title: `${json.count} data produksi berhasil diimpor` });
+      toast({ variant: "success", title: `${imported} data produksi berhasil diimpor` });
       setImportOpen(false);
       setImportResult(null);
       fetchData();
     } catch (err) {
-      toast({ variant: "destructive", title: "Gagal impor", description: err instanceof Error ? err.message : "Terjadi kesalahan" });
+      toast({
+        variant: "destructive",
+        title: "Gagal impor",
+        description: imported > 0
+          ? `${imported} dari ${total} baris berhasil diimpor sebelum terhenti: ${err instanceof Error ? err.message : "Terjadi kesalahan"}`
+          : err instanceof Error ? err.message : "Terjadi kesalahan",
+      });
+      if (imported > 0) fetchData();
     } finally {
       setImporting(false);
+      setImportProgress(null);
     }
   }
 
@@ -523,7 +587,33 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
             <ArrowUpDown className="w-3.5 h-3.5" />
             {sortDir === "asc" ? "Tanggal Terlama" : "Tanggal Terbaru"}
           </Button>
+
+          {isOwner && (
+            <Button
+              variant={selectMode ? "default" : "outline"}
+              size="sm"
+              className={`h-9 gap-1.5 text-xs shrink-0 ${selectMode ? "bg-green-600 hover:bg-green-700" : ""}`}
+              onClick={toggleSelectMode}
+            >
+              <ListChecks className="w-3.5 h-3.5" />
+              {selectMode ? "Batal Pilih" : "Pilih"}
+            </Button>
+          )}
         </div>
+
+        {selectMode && (
+          <div className="flex items-center justify-between bg-green-50 border border-green-100 rounded-xl px-3 py-2">
+            <button onClick={selectAllVisible} className="flex items-center gap-1.5 text-xs text-green-700 font-medium">
+              {selectedIds.length > 0 && selectedIds.length === displayRecords.length ? (
+                <CheckSquare className="w-4 h-4" />
+              ) : (
+                <Square className="w-4 h-4" />
+              )}
+              Pilih semua ({displayRecords.length})
+            </button>
+            <span className="text-xs text-green-700">{selectedIds.length} dipilih</span>
+          </div>
+        )}
 
         {fetching ? (
           <div className="space-y-3">
@@ -543,9 +633,23 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
           <div className="space-y-2">
             {displayRecords.map((r) => {
               const { hd, feedIntake, fcr, hpp } = computeMetrics(r);
+              const isSelected = selectedIds.includes(r.id);
               return (
-                <div key={r.id} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-                  <div className="flex items-start justify-between">
+                <div
+                  key={r.id}
+                  className={`bg-white rounded-xl p-4 border shadow-sm flex gap-2 ${isSelected ? "border-green-300 bg-green-50/40" : "border-gray-100"}`}
+                  onClick={selectMode ? () => toggleSelected(r.id) : undefined}
+                >
+                  {selectMode && (
+                    <button onClick={(e) => { e.stopPropagation(); toggleSelected(r.id); }} className="shrink-0 pt-0.5">
+                      {isSelected ? (
+                        <CheckSquare className="w-5 h-5 text-green-600" />
+                      ) : (
+                        <Square className="w-5 h-5 text-gray-300" />
+                      )}
+                    </button>
+                  )}
+                  <div className="flex items-start justify-between flex-1 min-w-0">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-xs text-gray-400">{formatDate(r.date)}</span>
@@ -580,16 +684,18 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
                       )}
                       {r.notes && <p className="text-xs text-gray-400 mt-1 truncate">{r.notes}</p>}
                     </div>
-                    <div className="flex gap-1 ml-2">
-                      <button onClick={() => openEdit(r)} className="p-2 rounded-lg hover:bg-gray-100 active:bg-gray-200">
-                        <Edit2 className="w-4 h-4 text-gray-400" />
-                      </button>
-                      {isOwner && (
-                        <button onClick={() => setDeleteId(r.id)} className="p-2 rounded-lg hover:bg-red-50 active:bg-red-100">
-                          <Trash2 className="w-4 h-4 text-red-400" />
+                    {!selectMode && (
+                      <div className="flex gap-1 ml-2">
+                        <button onClick={() => openEdit(r)} className="p-2 rounded-lg hover:bg-gray-100 active:bg-gray-200">
+                          <Edit2 className="w-4 h-4 text-gray-400" />
                         </button>
-                      )}
-                    </div>
+                        {isOwner && (
+                          <button onClick={() => setDeleteId(r.id)} className="p-2 rounded-lg hover:bg-red-50 active:bg-red-100">
+                            <Trash2 className="w-4 h-4 text-red-400" />
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -598,13 +704,28 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
         )}
       </div>
 
-      <button
-        onClick={openCreate}
-        className="fixed right-4 w-14 h-14 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white rounded-full shadow-lg flex items-center justify-center z-30 transition-colors"
-        style={{ bottom: "calc(4.5rem + env(safe-area-inset-bottom))" }}
-      >
-        <Plus className="w-6 h-6" />
-      </button>
+      {selectMode && selectedIds.length > 0 ? (
+        <div
+          className="fixed left-0 right-0 z-30 px-4 flex justify-center"
+          style={{ bottom: "calc(4.5rem + env(safe-area-inset-bottom))" }}
+        >
+          <div className="bg-white border border-gray-200 shadow-lg rounded-2xl px-4 py-3 flex items-center gap-3 max-w-md w-full">
+            <span className="text-sm text-gray-600 flex-1">{selectedIds.length} data dipilih</span>
+            <Button variant="outline" size="sm" onClick={() => setSelectedIds([])}>Batal</Button>
+            <Button variant="destructive" size="sm" onClick={() => setBulkDeleteOpen(true)} className="gap-1.5">
+              <Trash2 className="w-4 h-4" /> Hapus
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={openCreate}
+          className="fixed right-4 w-14 h-14 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white rounded-full shadow-lg flex items-center justify-center z-30 transition-colors"
+          style={{ bottom: "calc(4.5rem + env(safe-area-inset-bottom))" }}
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      )}
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
         <SheetContent side="bottom" className="max-h-[92vh] overflow-y-auto rounded-t-2xl">
@@ -726,6 +847,21 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
         </DialogContent>
       </Dialog>
 
+      <Dialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <DialogContent className="max-w-sm mx-4">
+          <DialogHeader><DialogTitle>Hapus {selectedIds.length} Data?</DialogTitle></DialogHeader>
+          <p className="text-sm text-gray-500">
+            {selectedIds.length} catatan produksi yang dipilih akan dihapus permanen, beserta catatan Pemakaian Pakan otomatis yang terhubung.
+          </p>
+          <DialogFooter className="flex-row gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setBulkDeleteOpen(false)}>Batal</Button>
+            <Button variant="destructive" className="flex-1" onClick={confirmBulkDelete} disabled={bulkDeleting}>
+              {bulkDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : `Hapus ${selectedIds.length} Data`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={importOpen} onOpenChange={(o) => { setImportOpen(o); if (!o) setImportResult(null); }}>
         <DialogContent className="max-w-sm mx-4 max-h-[80vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Pratinjau Import Excel</DialogTitle></DialogHeader>
@@ -750,10 +886,23 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
               {importResult.rows.length === 0 && (
                 <p className="text-sm text-gray-400">Tidak ada baris valid untuk diimpor.</p>
               )}
+              {importProgress && (
+                <div className="space-y-1">
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-green-600 transition-all"
+                      style={{ width: `${Math.round((importProgress.done / importProgress.total) * 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 text-right">
+                    {importProgress.done} / {importProgress.total} baris diimpor
+                  </p>
+                </div>
+              )}
             </div>
           )}
           <DialogFooter className="flex-row gap-3">
-            <Button variant="outline" className="flex-1" onClick={() => { setImportOpen(false); setImportResult(null); }}>Batal</Button>
+            <Button variant="outline" className="flex-1" onClick={() => { setImportOpen(false); setImportResult(null); }} disabled={importing}>Batal</Button>
             <Button
               className="flex-1 bg-green-600 hover:bg-green-700"
               onClick={submitImport}

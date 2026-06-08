@@ -3,6 +3,10 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { bulkCreateProductions, type CreateProductionInput } from "@/services/production.service";
 
+// Impor besar terhadap database remote bisa memakan waktu lebih dari batas default —
+// klien sudah memecah baris jadi beberapa request, ini hanya margin keamanan tambahan.
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);

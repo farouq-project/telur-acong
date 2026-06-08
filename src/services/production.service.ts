@@ -169,33 +169,58 @@ export async function createProduction(input: CreateProductionInput) {
   });
 }
 
+function buildProductionData(input: CreateProductionInput) {
+  return {
+    date: new Date(input.date),
+    house: input.house,
+    populasi: input.populasi ?? null,
+    goodEggs: input.goodEggs,
+    crackedEggs: input.crackedEggs,
+    rejectedEggs: input.rejectedEggs,
+    goodEggsKg: input.goodEggsKg ?? null,
+    crackedEggsKg: input.crackedEggsKg ?? null,
+    rejectedEggsKg: input.rejectedEggsKg ?? null,
+    feedQtyKg: input.feedQtyKg ?? null,
+    feedPricePerKg: input.feedPricePerKg ?? null,
+    feedProductId: input.feedProductId ?? null,
+    mortality: input.mortality ?? null,
+    notes: input.notes ?? null,
+  };
+}
+
+const BULK_CHUNK_SIZE = 200;
+
+// Baris tanpa Jenis Pakan + Pakan (kg) tidak memerlukan sinkronisasi FeedUsage,
+// jadi bisa dimasukkan sekaligus lewat createMany (jauh lebih cepat untuk impor besar
+// terhadap database remote — menghindari timeout serverless function).
 export async function bulkCreateProductions(inputs: CreateProductionInput[]) {
   let count = 0;
-  for (const input of inputs) {
-    await prisma.$transaction(async (tx) => {
-      const record = await tx.eggProduction.create({
-        data: {
-          date: new Date(input.date),
-          house: input.house,
-          populasi: input.populasi ?? null,
-          goodEggs: input.goodEggs,
-          crackedEggs: input.crackedEggs,
-          rejectedEggs: input.rejectedEggs,
-          goodEggsKg: input.goodEggsKg ?? null,
-          crackedEggsKg: input.crackedEggsKg ?? null,
-          rejectedEggsKg: input.rejectedEggsKg ?? null,
-          feedQtyKg: input.feedQtyKg ?? null,
-          feedPricePerKg: input.feedPricePerKg ?? null,
-          feedProductId: input.feedProductId ?? null,
-          mortality: input.mortality ?? null,
-          notes: input.notes ?? null,
-        },
-      });
 
-      await syncProductionFeedUsage(tx, record, input.feedProductId, input.feedQtyKg);
-    });
-    count += 1;
+  for (let i = 0; i < inputs.length; i += BULK_CHUNK_SIZE) {
+    const chunk = inputs.slice(i, i + BULK_CHUNK_SIZE);
+    const plain: CreateProductionInput[] = [];
+    const withFeed: CreateProductionInput[] = [];
+    for (const input of chunk) {
+      if (input.feedProductId && input.feedQtyKg != null && input.feedQtyKg > 0) withFeed.push(input);
+      else plain.push(input);
+    }
+
+    if (plain.length > 0) {
+      const result = await prisma.eggProduction.createMany({
+        data: plain.map(buildProductionData),
+      });
+      count += result.count;
+    }
+
+    for (const input of withFeed) {
+      await prisma.$transaction(async (tx) => {
+        const record = await tx.eggProduction.create({ data: buildProductionData(input) });
+        await syncProductionFeedUsage(tx, record, input.feedProductId, input.feedQtyKg);
+      });
+      count += 1;
+    }
   }
+
   return count;
 }
 
@@ -237,6 +262,12 @@ export async function updateProduction(
 export async function deleteProduction(id: string) {
   // FeedUsage terhubung dihapus otomatis lewat onDelete: Cascade pada relasi productionId
   await prisma.eggProduction.delete({ where: { id } });
+}
+
+export async function deleteProductions(ids: string[]) {
+  // FeedUsage terhubung dihapus otomatis lewat onDelete: Cascade pada relasi productionId
+  const result = await prisma.eggProduction.deleteMany({ where: { id: { in: ids } } });
+  return result.count;
 }
 
 export async function getTodayProduction(): Promise<number> {
