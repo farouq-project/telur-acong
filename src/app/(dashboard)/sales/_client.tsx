@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { addDays, parseISO } from "date-fns";
 import { Plus, Search, Edit2, Trash2, Loader2, X, FileText, Printer } from "lucide-react";
 import { MobileHeader } from "@/components/layout/MobileHeader";
 import { Button } from "@/components/ui/button";
@@ -23,8 +24,14 @@ const schema = z.object({
   customerName: z.string().min(1, "Nama pelanggan wajib diisi"),
   qtySold: z.coerce.number().min(0.01, "Jumlah minimal 0.01"),
   unitPrice: z.coerce.number().min(1, "Harga wajib diisi"),
+  jatuhTempoDays: z.union([z.coerce.number().int().min(0), z.literal("")]).optional(),
   notes: z.string().optional(),
 });
+
+function dueDate(saleDate: string, days?: number | null): Date | null {
+  if (days === null || days === undefined) return null;
+  return addDays(parseISO(saleDate), days);
+}
 
 type FormData = z.infer<typeof schema>;
 
@@ -76,6 +83,17 @@ function InvoiceView({ sale }: { sale: EggSale }) {
             <span className="label text-gray-500">Pelanggan</span>
             <span className="font-medium">{sale.customerName}</span>
           </div>
+          {sale.jatuhTempoDays != null && (
+            <div className="row flex justify-between">
+              <span className="label text-gray-500">Jatuh Tempo</span>
+              <span className="font-medium text-red-600">
+                {(() => {
+                  const d = dueDate(sale.date, sale.jatuhTempoDays);
+                  return d ? `${formatDate(d)} (${sale.jatuhTempoDays} hari)` : "–";
+                })()}
+              </span>
+            </div>
+          )}
         </div>
         <div className="divider border-t border-dashed border-gray-200 my-3" />
         <div className="space-y-2 text-sm">
@@ -124,7 +142,7 @@ export default function SalesClient({ initialData }: Props) {
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { date: todayISO(), customerName: "", qtySold: 1, unitPrice: 0, notes: "" },
+    defaultValues: { date: todayISO(), customerName: "", qtySold: 1, unitPrice: 0, jatuhTempoDays: "", notes: "" },
   });
 
   const watchQty = form.watch("qtySold");
@@ -153,7 +171,7 @@ export default function SalesClient({ initialData }: Props) {
   }, [search]);
 
   function openCreate() {
-    form.reset({ date: todayISO(), customerName: "", qtySold: 1, unitPrice: 0, notes: "" });
+    form.reset({ date: todayISO(), customerName: "", qtySold: 1, unitPrice: 0, jatuhTempoDays: "", notes: "" });
     setEditingId(null);
     setIsSheetOpen(true);
   }
@@ -164,6 +182,7 @@ export default function SalesClient({ initialData }: Props) {
       customerName: record.customerName,
       qtySold: record.qtySold,
       unitPrice: record.unitPrice,
+      jatuhTempoDays: record.jatuhTempoDays ?? "",
       notes: record.notes ?? "",
     });
     setEditingId(record.id);
@@ -249,6 +268,12 @@ export default function SalesClient({ initialData }: Props) {
                       <span>{formatRupiah(r.unitPrice)}/kg</span>
                     </div>
                     <p className="text-sm font-semibold text-purple-600 mt-1">{formatRupiah(r.totalValue)}</p>
+                    {r.jatuhTempoDays != null && (() => {
+                      const d = dueDate(r.date, r.jatuhTempoDays);
+                      return d ? (
+                        <p className="text-xs text-red-500 mt-0.5">Jatuh tempo: {formatDate(d)} ({r.jatuhTempoDays} hari)</p>
+                      ) : null;
+                    })()}
                     {r.invoiceNo && <p className="text-xs text-gray-300 font-mono">{r.invoiceNo}</p>}
                   </div>
                   <div className="flex gap-1">
@@ -312,6 +337,11 @@ export default function SalesClient({ initialData }: Props) {
                 <Label>Harga/kg (Rp)</Label>
                 <Input type="number" min="0" className="h-11" {...form.register("unitPrice")} />
               </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Jatuh Tempo (hari, opsional)</Label>
+              <Input type="number" min="0" step="1" placeholder="Contoh: 14" className="h-11" {...form.register("jatuhTempoDays")} />
+              <p className="text-xs text-gray-400">Jumlah hari dari tanggal penjualan sampai batas pembayaran. Kosongkan jika tidak ada tempo.</p>
             </div>
             {totalValue > 0 && (
               <div className="bg-purple-50 rounded-lg p-3">

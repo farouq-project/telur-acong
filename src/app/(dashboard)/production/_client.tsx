@@ -5,7 +5,9 @@ import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Search, Edit2, Trash2, Loader2, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Loader2, X } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { id } from "date-fns/locale";
 import { MobileHeader } from "@/components/layout/MobileHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,20 +17,19 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate, formatNumber, todayISO } from "@/lib/utils";
-import type { EggProduction } from "@/types";
+import type { EggProduction, House } from "@/types";
 
 const schema = z.object({
   date: z.string().min(1, "Tanggal wajib diisi"),
   house: z.string().min(1, "Kandang wajib diisi"),
   goodEggs: z.coerce.number().min(0, "Minimal 0"),
   crackedEggs: z.coerce.number().min(0, "Minimal 0"),
-  rejectedEggs: z.coerce.number().min(0, "Minimal 0"),
   populasi: z.coerce.number().min(0).optional().or(z.literal("")),
   goodEggsKg: z.coerce.number().min(0).optional().or(z.literal("")),
   crackedEggsKg: z.coerce.number().min(0).optional().or(z.literal("")),
-  rejectedEggsKg: z.coerce.number().min(0).optional().or(z.literal("")),
   feedQtyKg: z.coerce.number().min(0).optional().or(z.literal("")),
   feedPricePerKg: z.coerce.number().min(0).optional().or(z.literal("")),
   mortality: z.coerce.number().min(0).optional().or(z.literal("")),
@@ -39,20 +40,23 @@ type FormData = z.infer<typeof schema>;
 
 interface Props {
   initialData: EggProduction[];
+  houses: House[];
 }
 
 function computeMetrics(r: EggProduction) {
-  const totalEggs = r.goodEggs + r.crackedEggs + r.rejectedEggs;
-  const hd = r.populasi && r.populasi > 0 ? ((totalEggs / r.populasi) * 100) : null;
-  const feedIntake = r.populasi && r.populasi > 0 && r.feedQtyKg ? (r.feedQtyKg / r.populasi) : null;
-  const fcr = r.goodEggsKg && r.goodEggsKg > 0 && r.feedQtyKg ? ((r.feedQtyKg / r.goodEggsKg) * 100) : null;
+  const totalEggs = r.goodEggs + r.crackedEggs;
+  const totalEggsKg = (r.goodEggsKg ?? 0) + (r.crackedEggsKg ?? 0);
+  const sisaPopulasi = r.populasi != null ? r.populasi - (r.mortality ?? 0) : null;
+  const hd = sisaPopulasi && sisaPopulasi > 0 ? ((totalEggs / sisaPopulasi) * 100) : null;
+  const feedIntake = sisaPopulasi && sisaPopulasi > 0 && r.feedQtyKg ? (r.feedQtyKg / sisaPopulasi) : null;
+  const fcr = totalEggsKg > 0 && r.feedQtyKg ? (r.feedQtyKg / totalEggsKg) : null;
   const hpp = r.goodEggsKg && r.goodEggsKg > 0 && r.feedQtyKg && r.feedPricePerKg
     ? ((r.feedQtyKg * r.feedPricePerKg) / r.goodEggsKg)
     : null;
   return { hd, feedIntake, fcr, hpp };
 }
 
-export default function ProductionClient({ initialData }: Props) {
+export default function ProductionClient({ initialData, houses }: Props) {
   const { data: session } = useSession();
   const { toast } = useToast();
   const [records, setRecords] = useState<EggProduction[]>(initialData);
@@ -63,13 +67,12 @@ export default function ProductionClient({ initialData }: Props) {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      date: todayISO(), house: "", goodEggs: 0, crackedEggs: 0, rejectedEggs: 0,
-      populasi: "", goodEggsKg: "", crackedEggsKg: "", rejectedEggsKg: "",
+      date: todayISO(), house: "", goodEggs: 0, crackedEggs: 0,
+      populasi: "", goodEggsKg: "", crackedEggsKg: "",
       feedQtyKg: "", feedPricePerKg: "", mortality: "", notes: "",
     },
   });
@@ -94,16 +97,15 @@ export default function ProductionClient({ initialData }: Props) {
   }, [search]);
 
   const defaultValues = {
-    date: todayISO(), house: "", goodEggs: 0, crackedEggs: 0, rejectedEggs: 0,
+    date: todayISO(), house: "", goodEggs: 0, crackedEggs: 0,
     populasi: "" as const, goodEggsKg: "" as const, crackedEggsKg: "" as const,
-    rejectedEggsKg: "" as const, feedQtyKg: "" as const, feedPricePerKg: "" as const,
+    feedQtyKg: "" as const, feedPricePerKg: "" as const,
     mortality: "" as const, notes: "",
   };
 
   function openCreate() {
     form.reset(defaultValues);
     setEditingId(null);
-    setShowAdvanced(false);
     setIsSheetOpen(true);
   }
 
@@ -113,19 +115,15 @@ export default function ProductionClient({ initialData }: Props) {
       house: record.house,
       goodEggs: record.goodEggs,
       crackedEggs: record.crackedEggs,
-      rejectedEggs: record.rejectedEggs,
       populasi: record.populasi ?? "",
       goodEggsKg: record.goodEggsKg ?? "",
       crackedEggsKg: record.crackedEggsKg ?? "",
-      rejectedEggsKg: record.rejectedEggsKg ?? "",
       feedQtyKg: record.feedQtyKg ?? "",
       feedPricePerKg: record.feedPricePerKg ?? "",
       mortality: record.mortality ?? "",
       notes: record.notes ?? "",
     });
     setEditingId(record.id);
-    const hasAdvanced = !!(record.populasi || record.feedQtyKg || record.goodEggsKg);
-    setShowAdvanced(hasAdvanced);
     setIsSheetOpen(true);
   }
 
@@ -139,7 +137,6 @@ export default function ProductionClient({ initialData }: Props) {
         populasi: data.populasi !== "" ? data.populasi : null,
         goodEggsKg: data.goodEggsKg !== "" ? data.goodEggsKg : null,
         crackedEggsKg: data.crackedEggsKg !== "" ? data.crackedEggsKg : null,
-        rejectedEggsKg: data.rejectedEggsKg !== "" ? data.rejectedEggsKg : null,
         feedQtyKg: data.feedQtyKg !== "" ? data.feedQtyKg : null,
         feedPricePerKg: data.feedPricePerKg !== "" ? data.feedPricePerKg : null,
         mortality: data.mortality !== "" ? data.mortality : null,
@@ -179,6 +176,42 @@ export default function ProductionClient({ initialData }: Props) {
   }
 
   const isOwner = session?.user?.role === "OWNER";
+
+  const watchedDate = form.watch("date");
+  const watchedHouse = form.watch("house");
+  const watchedMortality = form.watch("mortality");
+
+  const dayName = (() => {
+    if (!watchedDate) return "";
+    try {
+      return format(parseISO(watchedDate), "EEEE", { locale: id });
+    } catch {
+      return "";
+    }
+  })();
+
+  // Saat menambah data baru, isi Populasi otomatis = populasi sebelumnya - kematian.
+  // Sumber populasi sebelumnya: catatan produksi terakhir untuk kandang itu, atau jika belum ada, data Populasi Saat Ini dari menu Kandang.
+  useEffect(() => {
+    if (editingId) return;
+    if (!watchedHouse) return;
+    const kematian = watchedMortality === "" || watchedMortality == null ? 0 : Number(watchedMortality);
+
+    const previousRecord = records
+      .filter((r) => r.house.trim().toLowerCase() === watchedHouse.trim().toLowerCase() && r.populasi != null)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
+    if (previousRecord?.populasi != null) {
+      form.setValue("populasi", Math.max(0, previousRecord.populasi - kematian));
+      return;
+    }
+
+    const house = houses.find((h) => h.name.trim().toLowerCase() === watchedHouse.trim().toLowerCase());
+    if (house) {
+      form.setValue("populasi", Math.max(0, house.currentPopulation - kematian));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedHouse, watchedMortality, editingId, records, houses]);
 
   return (
     <>
@@ -240,7 +273,7 @@ export default function ProductionClient({ initialData }: Props) {
                             <span className="text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">FI {feedIntake.toFixed(3)} kg/ekor</span>
                           )}
                           {fcr !== null && (
-                            <span className="text-xs bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded">FCR {fcr.toFixed(1)}%</span>
+                            <span className="text-xs bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded">FCR {fcr.toFixed(5)}</span>
                           )}
                           {hpp !== null && (
                             <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded">HPP Rp{formatNumber(Math.round(hpp))}/kg</span>
@@ -283,19 +316,36 @@ export default function ProductionClient({ initialData }: Props) {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Tanggal</Label>
+                <Label className="flex items-center gap-1.5">
+                  Tanggal
+                  {dayName && <span className="text-xs font-normal text-gray-400">({dayName})</span>}
+                </Label>
                 <Input type="date" className="h-11" {...form.register("date")} />
               </div>
               <div className="space-y-1.5">
                 <Label>Kandang</Label>
-                <Input placeholder="Kandang A" className="h-11" {...form.register("house")} />
+                {houses.length > 0 ? (
+                  <Select onValueChange={(v) => form.setValue("house", v, { shouldValidate: true })} value={watchedHouse}>
+                    <SelectTrigger className="h-11"><SelectValue placeholder="Pilih kandang" /></SelectTrigger>
+                    <SelectContent>
+                      {houses.map((h) => (
+                        <SelectItem key={h.id} value={h.name}>{h.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input placeholder="Kandang A" className="h-11" {...form.register("house")} />
+                )}
+                <p className="text-xs text-gray-400">
+                  Belum ada di daftar? Tambahkan lewat menu <span className="font-medium">Lainnya &rarr; Kandang</span>
+                </p>
                 {form.formState.errors.house && (
                   <p className="text-xs text-red-500">{form.formState.errors.house.message}</p>
                 )}
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Telur Bagus (butir)</Label>
                 <Input type="number" min="0" className="h-11" {...form.register("goodEggs")} />
@@ -304,61 +354,43 @@ export default function ProductionClient({ initialData }: Props) {
                 <Label className="text-xs">Retak (butir)</Label>
                 <Input type="number" min="0" className="h-11" {...form.register("crackedEggs")} />
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">BS (butir)</Label>
-                <Input type="number" min="0" className="h-11" {...form.register("rejectedEggs")} />
-              </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 w-full py-1"
-            >
-              {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              Detail Lanjutan (Berat, Pakan, Populasi)
-            </button>
-
-            {showAdvanced && (
-              <div className="space-y-4 border-t pt-3">
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Bagus (kg)</Label>
-                    <Input type="number" min="0" step="0.01" className="h-11" placeholder="0.00" {...form.register("goodEggsKg")} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Retak (kg)</Label>
-                    <Input type="number" min="0" step="0.01" className="h-11" placeholder="0.00" {...form.register("crackedEggsKg")} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">BS (kg)</Label>
-                    <Input type="number" min="0" step="0.01" className="h-11" placeholder="0.00" {...form.register("rejectedEggsKg")} />
-                  </div>
+            <div className="space-y-4 border-t pt-3">
+              <p className="text-sm text-gray-500">Detail Lanjutan (Berat, Pakan, Populasi)</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Bagus (kg)</Label>
+                  <Input type="number" min="0" step="0.01" className="h-11" placeholder="0.00" {...form.register("goodEggsKg")} />
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Populasi (ekor)</Label>
-                    <Input type="number" min="0" className="h-11" placeholder="0" {...form.register("populasi")} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Kematian (ekor)</Label>
-                    <Input type="number" min="0" className="h-11" placeholder="0" {...form.register("mortality")} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Pakan (kg)</Label>
-                    <Input type="number" min="0" step="0.01" className="h-11" placeholder="0.00" {...form.register("feedQtyKg")} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Harga Pakan (Rp/kg)</Label>
-                    <Input type="number" min="0" className="h-11" placeholder="0" {...form.register("feedPricePerKg")} />
-                  </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Retak (kg)</Label>
+                  <Input type="number" min="0" step="0.01" className="h-11" placeholder="0.00" {...form.register("crackedEggsKg")} />
                 </div>
               </div>
-            )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Populasi (ekor)</Label>
+                  <Input type="number" min="0" className="h-11" placeholder="0" {...form.register("populasi")} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Kematian (ekor)</Label>
+                  <Input type="number" min="0" className="h-11" placeholder="0" {...form.register("mortality")} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Pakan (kg)</Label>
+                  <Input type="number" min="0" step="0.01" className="h-11" placeholder="0.00" {...form.register("feedQtyKg")} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Harga Pakan (Rp/kg)</Label>
+                  <Input type="number" min="0" className="h-11" placeholder="0" {...form.register("feedPricePerKg")} />
+                </div>
+              </div>
+            </div>
 
             <div className="space-y-1.5">
               <Label>Catatan (opsional)</Label>

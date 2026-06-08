@@ -3,15 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { Egg, Wheat, TrendingDown, TrendingUp, RefreshCw } from "lucide-react";
+import { Egg, Wheat, TrendingDown, TrendingUp, RefreshCw, History, PackagePlus } from "lucide-react";
 import { MobileHeader } from "@/components/layout/MobileHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatNumber } from "@/lib/utils";
-import type { FeedStockItem } from "@/services/stock.service";
+import type { FeedStockItem, EggStockBreakdown } from "@/services/stock.service";
 
 interface StockData {
-  eggStock: number;
+  eggStock: EggStockBreakdown;
   feedStocks: FeedStockItem[];
 }
 
@@ -39,28 +39,74 @@ export default function StockClient({ initialData }: Props) {
           </button>
         </div>
 
-        <Card className={data.eggStock < 500 ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}>
+        <Card className={data.eggStock.currentStock < 500 ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}>
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <Egg className="w-5 h-5 text-green-600" />
-                  <span className="font-medium text-gray-700">Stok Telur</span>
+                  <span className="font-medium text-gray-700">Stok Telur Saat Ini</span>
                 </div>
                 <p className="text-3xl font-bold text-gray-900">
-                  {formatNumber(data.eggStock)}
+                  {formatNumber(data.eggStock.currentStock)}
                   <span className="text-sm font-normal text-gray-400 ml-1">kg</span>
                 </p>
-                <p className="text-xs text-gray-400 mt-1">Total Produksi (kg) − Total Penjualan (kg)</p>
+                <p className="text-xs text-gray-400 mt-1">Stok kemarin + produksi hari ini − terjual hari ini</p>
               </div>
               <div>
-                {data.eggStock < 500 ? (
+                {data.eggStock.currentStock < 500 ? (
                   <Badge variant="destructive">Rendah</Badge>
                 ) : (
                   <Badge variant="success">Normal</Badge>
                 )}
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <History className="w-4 h-4 text-gray-500" />
+              Rincian Stok Telur Hari Ini
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-gray-50 rounded-xl p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <History className="w-3.5 h-3.5 text-gray-400" />
+                  <span className="text-xs text-gray-500">Stok Kemarin</span>
+                </div>
+                <p className="text-base font-bold text-gray-800">
+                  {formatNumber(data.eggStock.previousStock)}
+                  <span className="text-xs font-normal text-gray-400 ml-0.5">kg</span>
+                </p>
+              </div>
+              <div className="bg-blue-50 rounded-xl p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <PackagePlus className="w-3.5 h-3.5 text-blue-500" />
+                  <span className="text-xs text-blue-600">Produksi Hari Ini</span>
+                </div>
+                <p className="text-base font-bold text-blue-700">
+                  +{formatNumber(data.eggStock.todayProduced)}
+                  <span className="text-xs font-normal text-blue-400 ml-0.5">kg</span>
+                </p>
+              </div>
+              <div className="bg-purple-50 rounded-xl p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <TrendingDown className="w-3.5 h-3.5 text-purple-500" />
+                  <span className="text-xs text-purple-600">Terjual Hari Ini</span>
+                </div>
+                <p className="text-base font-bold text-purple-700">
+                  −{formatNumber(data.eggStock.todaySold)}
+                  <span className="text-xs font-normal text-purple-400 ml-0.5">kg</span>
+                </p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mt-3">
+              Stok saat ini = stok kemarin ({formatNumber(data.eggStock.previousStock)} kg) + produksi hari ini ({formatNumber(data.eggStock.todayProduced)} kg) − terjual hari ini ({formatNumber(data.eggStock.todaySold)} kg) = <span className="font-medium text-gray-600">{formatNumber(data.eggStock.currentStock)} kg</span>
+            </p>
           </CardContent>
         </Card>
 

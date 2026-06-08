@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await request.json();
-    const { date, customerName, qtySold, unitPrice, notes } = body;
+    const { date, customerName, qtySold, unitPrice, jatuhTempoDays, notes } = body;
 
     if (!date || !customerName || !qtySold || !unitPrice) {
       return NextResponse.json({ error: "Data tidak lengkap" }, { status: 400 });
@@ -48,6 +48,10 @@ export async function POST(request: NextRequest) {
       qtySold: parseFloat(qtySold),
       unitPrice: parseFloat(unitPrice),
       invoiceNo: generateInvoiceNo(date),
+      jatuhTempoDays:
+        jatuhTempoDays !== undefined && jatuhTempoDays !== null && jatuhTempoDays !== ""
+          ? parseInt(jatuhTempoDays)
+          : null,
       notes,
     });
 

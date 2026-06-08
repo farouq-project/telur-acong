@@ -194,7 +194,20 @@ export async function getProductionTrend(days = 30) {
   return Object.entries(grouped).map(([date, value]) => ({ date, value }));
 }
 
-export async function getHouseMetrics(days = 30) {
+export interface DailyMetric {
+  id: string;
+  date: string;
+  house: string;
+  fcr: number | null;
+  hd: number | null;
+  feedIntake: number | null;
+}
+
+// Metrik dihitung per hari per kandang langsung dari satu record produksi:
+// - FCR = Pakan (kg) / Total Produksi Telur (kg) [Bagus + Retak] — rasio desimal
+// - HD  = Total Butir [Bagus + Retak] / Sisa Populasi [Populasi - Kematian] — persentase
+// - FI  = Pakan (kg) / Sisa Populasi [Populasi - Kematian] — rasio desimal
+export async function getDailyMetrics(days = 14) {
   const from = new Date();
   from.setDate(from.getDate() - days);
   from.setHours(0, 0, 0, 0);
@@ -202,51 +215,37 @@ export async function getHouseMetrics(days = 30) {
   const records = await prisma.eggProduction.findMany({
     where: { date: { gte: from } },
     select: {
+      id: true,
+      date: true,
       house: true,
       populasi: true,
+      mortality: true,
       goodEggs: true,
-      feedQtyKg: true,
+      crackedEggs: true,
       goodEggsKg: true,
+      crackedEggsKg: true,
+      feedQtyKg: true,
     },
-    orderBy: { date: "asc" },
+    orderBy: [{ date: "desc" }, { house: "asc" }],
   });
 
-  const grouped: Record<string, {
-    totalFeedKg: number;
-    totalGoodEggsKg: number;
-    totalGoodEggs: number;
-    populasiSum: number;
-    populasiCount: number;
-  }> = {};
+  return records.map((r): DailyMetric => {
+    const feedQtyKg = decimalToNumber(r.feedQtyKg);
+    const totalEggsKg = decimalToNumber(r.goodEggsKg) + decimalToNumber(r.crackedEggsKg);
+    const totalEggs = r.goodEggs + r.crackedEggs;
+    const sisaPopulasi = r.populasi != null ? r.populasi - (r.mortality ?? 0) : null;
 
-  records.forEach((r) => {
-    if (!grouped[r.house]) {
-      grouped[r.house] = { totalFeedKg: 0, totalGoodEggsKg: 0, totalGoodEggs: 0, populasiSum: 0, populasiCount: 0 };
-    }
-    const g = grouped[r.house];
-    g.totalFeedKg += decimalToNumber(r.feedQtyKg);
-    g.totalGoodEggsKg += decimalToNumber(r.goodEggsKg);
-    g.totalGoodEggs += r.goodEggs;
-    if (r.populasi) {
-      g.populasiSum += r.populasi;
-      g.populasiCount += 1;
-    }
-  });
+    const fcr = totalEggsKg > 0 && feedQtyKg > 0 ? feedQtyKg / totalEggsKg : null;
+    const hd = sisaPopulasi != null && sisaPopulasi > 0 ? (totalEggs / sisaPopulasi) * 100 : null;
+    const feedIntake = sisaPopulasi != null && sisaPopulasi > 0 && feedQtyKg > 0 ? feedQtyKg / sisaPopulasi : null;
 
-  return Object.entries(grouped).map(([house, g]) => {
-    const avgPopulasi = g.populasiCount > 0 ? g.populasiSum / g.populasiCount : 0;
-    const feedIntake = avgPopulasi > 0 ? g.totalFeedKg / avgPopulasi : 0;
-    const fcr = g.totalGoodEggsKg > 0 ? (g.totalFeedKg / g.totalGoodEggsKg) * 100 : 0;
-    const hd = avgPopulasi > 0 ? (g.totalGoodEggs / (avgPopulasi * g.populasiCount)) * 100 : 0;
     return {
-      house,
-      totalFeedKg: g.totalFeedKg,
-      totalGoodEggsKg: g.totalGoodEggsKg,
-      totalGoodEggs: g.totalGoodEggs,
-      avgPopulasi: Math.round(avgPopulasi),
-      feedIntake: Math.round(feedIntake * 100) / 100,
-      fcr: Math.round(fcr * 100) / 100,
-      hd: Math.round(hd * 100) / 100,
+      id: r.id,
+      date: r.date.toISOString(),
+      house: r.house,
+      fcr: fcr !== null ? Math.round(fcr * 100000) / 100000 : null,
+      hd: hd !== null ? Math.round(hd * 100) / 100 : null,
+      feedIntake: feedIntake !== null ? Math.round(feedIntake * 1000) / 1000 : null,
     };
   });
 }

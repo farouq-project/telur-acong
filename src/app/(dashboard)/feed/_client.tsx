@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Edit2, Trash2, Loader2 } from "lucide-react";
+import { Plus, Edit2, Trash2, Loader2, ShoppingBag, Wheat, ShoppingCart } from "lucide-react";
 import { MobileHeader } from "@/components/layout/MobileHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,6 +68,7 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
   const [feedSales, setFeedSales] = useState<FeedSale[]>(initialFeedSales);
   const [fetching, setFetching] = useState(false);
   const [activeSheet, setActiveSheet] = useState<"purchase" | "usage" | "sale" | "product" | null>(null);
+  const [chooserOpen, setChooserOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -204,15 +205,18 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
               purchases.length === 0 ? <Empty label="Belum ada pembelian pakan" /> :
               purchases.map((r) => (
                 <FeedRow key={r.id}
+                  icon={<ShoppingBag className="w-4 h-4" />}
+                  accent="green"
+                  label="Pembelian"
                   title={(r.feedProduct as FeedProduct)?.name ?? ""}
-                  subtitle={`${formatNumber(r.qty)} ${(r.feedProduct as FeedProduct)?.unit ?? "kg"}`}
+                  qty={`${formatNumber(r.qty)} ${(r.feedProduct as FeedProduct)?.unit ?? "kg"}`}
+                  detail={r.notes || undefined}
                   date={r.date}
                   onEdit={() => openPurchase(r)}
                   onDelete={() => setDeleteTarget({ id: r.id, type: "purchase" })}
                   isOwner={isOwner}
                 />
               ))}
-            <AddButton onClick={() => openPurchase()} />
           </TabsContent>
 
           <TabsContent value="usage" className="space-y-2">
@@ -220,15 +224,18 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
               usages.length === 0 ? <Empty label="Belum ada pemakaian pakan" /> :
               usages.map((r) => (
                 <FeedRow key={r.id}
+                  icon={<Wheat className="w-4 h-4" />}
+                  accent="amber"
+                  label="Pemakaian"
                   title={(r.feedProduct as FeedProduct)?.name ?? ""}
-                  subtitle={`${r.house} — ${formatNumber(r.qtyUsed)} ${(r.feedProduct as FeedProduct)?.unit ?? "kg"}`}
+                  qty={`${formatNumber(r.qtyUsed)} ${(r.feedProduct as FeedProduct)?.unit ?? "kg"}`}
+                  detail={`Kandang ${r.house}`}
                   date={r.date}
                   onEdit={() => openUsage(r)}
                   onDelete={() => setDeleteTarget({ id: r.id, type: "usage" })}
                   isOwner={isOwner}
                 />
               ))}
-            <AddButton onClick={() => openUsage()} />
           </TabsContent>
 
           <TabsContent value="sales" className="space-y-2">
@@ -236,15 +243,18 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
               feedSales.length === 0 ? <Empty label="Belum ada penjualan pakan" /> :
               feedSales.map((r) => (
                 <FeedRow key={r.id}
+                  icon={<ShoppingCart className="w-4 h-4" />}
+                  accent="purple"
+                  label="Penjualan"
                   title={r.customerName}
-                  subtitle={`${(r.feedProduct as FeedProduct)?.name} — ${formatNumber(r.qty)} — ${formatRupiah(r.totalValue)}`}
+                  qty={`${(r.feedProduct as FeedProduct)?.name ?? ""} — ${formatNumber(r.qty)}`}
+                  detail={formatRupiah(r.totalValue)}
                   date={r.date}
                   onEdit={() => openSale(r)}
                   onDelete={() => setDeleteTarget({ id: r.id, type: "sale" })}
                   isOwner={isOwner}
                 />
               ))}
-            <AddButton onClick={() => openSale()} />
           </TabsContent>
 
           <TabsContent value="products" className="space-y-2">
@@ -264,6 +274,44 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
           </TabsContent>
         </Tabs>
       </div>
+
+      <button
+        onClick={() => setChooserOpen(true)}
+        className="fixed bottom-20 right-5 z-30 w-14 h-14 rounded-full bg-green-600 hover:bg-green-700 text-white shadow-lg flex items-center justify-center transition-colors"
+        aria-label="Tambah catatan pakan"
+      >
+        <Plus className="w-6 h-6" />
+      </button>
+
+      <Sheet open={chooserOpen} onOpenChange={setChooserOpen}>
+        <SheetContent side="bottom" className="rounded-t-2xl">
+          <SheetHeader className="mb-2"><SheetTitle>Tambah Catatan Pakan</SheetTitle></SheetHeader>
+          <p className="text-xs text-gray-400 mb-4">Pilih jenis catatan yang ingin ditambahkan</p>
+          <div className="space-y-2 pb-4">
+            <ChooserOption
+              icon={<ShoppingBag className="w-5 h-5" />}
+              accent="green"
+              title="Pembelian"
+              description="Catat pakan masuk dari pembelian"
+              onClick={() => { setChooserOpen(false); openPurchase(); }}
+            />
+            <ChooserOption
+              icon={<Wheat className="w-5 h-5" />}
+              accent="amber"
+              title="Pemakaian"
+              description="Catat pakan yang digunakan di kandang"
+              onClick={() => { setChooserOpen(false); openUsage(); }}
+            />
+            <ChooserOption
+              icon={<ShoppingCart className="w-5 h-5" />}
+              accent="purple"
+              title="Penjualan"
+              description="Catat pakan yang terjual ke pelanggan"
+              onClick={() => { setChooserOpen(false); openSale(); }}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <Sheet open={activeSheet === "purchase"} onOpenChange={(o) => !o && setActiveSheet(null)}>
         <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto rounded-t-2xl">
@@ -389,20 +437,37 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
   );
 }
 
-function FeedRow({ title, subtitle, date, onEdit, onDelete, isOwner }: {
-  title: string; subtitle: string; date: string;
+const ACCENT_STYLES: Record<string, { bg: string; text: string; border: string }> = {
+  green: { bg: "bg-green-50", text: "text-green-700", border: "border-l-green-400" },
+  amber: { bg: "bg-amber-50", text: "text-amber-700", border: "border-l-amber-400" },
+  purple: { bg: "bg-purple-50", text: "text-purple-700", border: "border-l-purple-400" },
+};
+
+function FeedRow({ icon, accent, label, title, qty, detail, date, onEdit, onDelete, isOwner }: {
+  icon: React.ReactNode; accent: "green" | "amber" | "purple"; label: string;
+  title: string; qty: string; detail?: string; date: string;
   onEdit: () => void; onDelete: () => void; isOwner: boolean;
 }) {
+  const a = ACCENT_STYLES[accent];
   return (
-    <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm flex items-center justify-between">
-      <div>
-        <p className="text-xs text-gray-400">{formatDate(date)}</p>
-        <p className="font-medium text-gray-800 text-sm">{title}</p>
-        <p className="text-xs text-gray-500">{subtitle}</p>
+    <div className={`bg-white rounded-xl p-3.5 border border-gray-100 border-l-4 ${a.border} shadow-sm flex items-center gap-3`}>
+      <div className={`w-9 h-9 rounded-lg ${a.bg} ${a.text} flex items-center justify-center shrink-0`}>
+        {icon}
       </div>
-      <div className="flex gap-1">
-        <button onClick={onEdit} className="p-2 rounded-lg hover:bg-gray-100"><Edit2 className="w-4 h-4 text-gray-400" /></button>
-        {isOwner && <button onClick={onDelete} className="p-2 rounded-lg hover:bg-red-50"><Trash2 className="w-4 h-4 text-red-400" /></button>}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2">
+          <span className={`text-[10px] font-medium uppercase tracking-wide ${a.text}`}>{label}</span>
+          <span className="text-[11px] text-gray-400 shrink-0">{formatDate(date)}</span>
+        </div>
+        <p className="font-semibold text-gray-800 text-sm truncate mt-0.5">{title}</p>
+        <div className="flex items-center justify-between gap-2 mt-0.5">
+          <p className="text-xs text-gray-600 truncate">{qty}</p>
+          {detail && <p className="text-xs text-gray-400 truncate shrink-0">{detail}</p>}
+        </div>
+      </div>
+      <div className="flex flex-col gap-0.5 shrink-0">
+        <button onClick={onEdit} className="p-1.5 rounded-lg hover:bg-gray-100"><Edit2 className="w-3.5 h-3.5 text-gray-400" /></button>
+        {isOwner && <button onClick={onDelete} className="p-1.5 rounded-lg hover:bg-red-50"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>}
       </div>
     </div>
   );
@@ -416,6 +481,27 @@ function AddButton({ onClick, label = "Tambah" }: { onClick: () => void; label?:
   return (
     <button onClick={onClick} className="w-full mt-2 h-12 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-green-300 hover:text-green-600 flex items-center justify-center gap-2 transition-colors">
       <Plus className="w-4 h-4" /> {label}
+    </button>
+  );
+}
+
+function ChooserOption({ icon, accent, title, description, onClick }: {
+  icon: React.ReactNode; accent: "green" | "amber" | "purple";
+  title: string; description: string; onClick: () => void;
+}) {
+  const a = ACCENT_STYLES[accent];
+  return (
+    <button
+      onClick={onClick}
+      className="w-full bg-white border border-gray-100 rounded-xl p-4 flex items-center gap-3 hover:border-gray-200 hover:bg-gray-50 transition-colors text-left"
+    >
+      <div className={`w-11 h-11 rounded-xl ${a.bg} ${a.text} flex items-center justify-center shrink-0`}>
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="font-medium text-gray-800 text-sm">{title}</p>
+        <p className="text-xs text-gray-400">{description}</p>
+      </div>
     </button>
   );
 }

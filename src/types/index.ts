@@ -7,6 +7,15 @@ export type NotificationType =
   | "GENERAL";
 export type FinType = "INCOME" | "EXPENSE";
 
+export interface House {
+  id: string;
+  name: string;
+  currentPopulation: number;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface EggProduction {
   id: string;
   date: string;
@@ -31,6 +40,7 @@ export interface EggSale {
   date: string;
   customerName: string;
   invoiceNo?: string | null;
+  jatuhTempoDays?: number | null;
   qtySold: number;
   unitPrice: number;
   totalValue: number;
@@ -136,15 +146,13 @@ export interface FinancialNote {
   updatedAt?: string;
 }
 
-export interface HouseMetric {
+export interface DailyMetric {
+  id: string;
+  date: string;
   house: string;
-  totalFeedKg: number;
-  totalGoodEggsKg: number;
-  totalGoodEggs: number;
-  avgPopulasi: number;
-  feedIntake: number;
-  fcr: number;
-  hd: number;
+  fcr: number | null;
+  hd: number | null;
+  feedIntake: number | null;
 }
 
 export interface User {
@@ -168,7 +176,7 @@ export interface DashboardStats {
   productionTrend: { date: string; value: number }[];
   salesTrend: { date: string; value: number }[];
   mortalityTrend: { date: string; value: number }[];
-  houseMetrics: HouseMetric[];
+  dailyMetrics: DailyMetric[];
 }
 
 export interface ApiResponse<T> {

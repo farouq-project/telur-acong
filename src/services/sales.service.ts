@@ -7,6 +7,7 @@ export interface CreateSaleInput {
   qtySold: number;
   unitPrice: number;
   invoiceNo?: string;
+  jatuhTempoDays?: number | null;
   notes?: string;
 }
 
@@ -15,6 +16,7 @@ function serializeSale(r: {
   date: Date;
   customerName: string;
   invoiceNo: string | null;
+  jatuhTempoDays: number | null;
   qtySold: unknown;
   unitPrice: unknown;
   totalValue: unknown;
@@ -84,6 +86,7 @@ export async function createSale(input: CreateSaleInput) {
       date: new Date(input.date),
       customerName: input.customerName,
       invoiceNo: input.invoiceNo ?? null,
+      jatuhTempoDays: input.jatuhTempoDays ?? null,
       qtySold: input.qtySold,
       unitPrice: input.unitPrice,
       totalValue,
@@ -108,6 +111,7 @@ export async function updateSale(id: string, input: Partial<CreateSaleInput>) {
       ...(input.customerName !== undefined && { customerName: input.customerName }),
       ...(input.qtySold !== undefined && { qtySold: input.qtySold }),
       ...(input.unitPrice !== undefined && { unitPrice: input.unitPrice }),
+      ...(input.jatuhTempoDays !== undefined && { jatuhTempoDays: input.jatuhTempoDays }),
       totalValue,
       ...(input.notes !== undefined && { notes: input.notes }),
     },

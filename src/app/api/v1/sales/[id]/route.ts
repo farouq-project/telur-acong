@@ -37,6 +37,10 @@ export async function PUT(
       customerName: body.customerName,
       qtySold: body.qtySold !== undefined ? parseFloat(body.qtySold) : undefined,
       unitPrice: body.unitPrice !== undefined ? parseFloat(body.unitPrice) : undefined,
+      jatuhTempoDays:
+        body.jatuhTempoDays !== undefined
+          ? (body.jatuhTempoDays === null || body.jatuhTempoDays === "" ? null : parseInt(body.jatuhTempoDays))
+          : undefined,
       notes: body.notes,
     });
 

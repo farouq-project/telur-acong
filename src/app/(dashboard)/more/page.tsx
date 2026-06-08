@@ -13,6 +13,7 @@ import {
   FileText,
   Package,
   Wallet,
+  Home,
 } from "lucide-react";
 import { MobileHeader } from "@/components/layout/MobileHeader";
 import { Separator } from "@/components/ui/separator";
@@ -21,6 +22,7 @@ const menuItems = [
   {
     section: "Operasional",
     items: [
+      { href: "/kandang", label: "Kandang", icon: Home, color: "bg-teal-100 text-teal-600" },
       { href: "/medicine", label: "Obat & Vaksin", icon: Syringe, color: "bg-blue-100 text-blue-600" },
       { href: "/vaccination", label: "Jadwal Vaksin", icon: CalendarCheck, color: "bg-emerald-100 text-emerald-600" },
       { href: "/mortality", label: "Kematian Ternak", icon: Skull, color: "bg-red-100 text-red-600" },
