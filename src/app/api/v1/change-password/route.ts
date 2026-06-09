@@ -7,6 +7,9 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (session.user.role !== "DEVELOPER") {
+      return NextResponse.json({ error: "Hanya developer yang dapat mengubah password" }, { status: 403 });
+    }
 
     const body = await request.json();
     const { currentPassword, newPassword } = body;

@@ -224,7 +224,7 @@ export default function SalesClient({ initialData }: Props) {
     }
   }
 
-  const isOwner = session?.user?.role === "OWNER";
+  const isOwner = (session?.user?.role === "OWNER" || session?.user?.role === "DEVELOPER");
 
   return (
     <>

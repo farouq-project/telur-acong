@@ -10,8 +10,8 @@ export async function PUT(
   try {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    if (session.user.role !== "OWNER") {
-      return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
+    if (session.user.role !== "DEVELOPER") {
+      return NextResponse.json({ error: "Hanya developer yang dapat mengelola pengguna" }, { status: 403 });
     }
 
     const { id } = await params;
@@ -21,12 +21,12 @@ export async function PUT(
       email: body.email,
       role: body.role,
       isActive: body.isActive,
+      companyName: body.companyName ?? null,
     });
 
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Internal server error";
+    const message = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -38,8 +38,8 @@ export async function PATCH(
   try {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    if (session.user.role !== "OWNER") {
-      return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
+    if (session.user.role !== "DEVELOPER") {
+      return NextResponse.json({ error: "Hanya developer yang dapat mengelola pengguna" }, { status: 403 });
     }
 
     const { id } = await params;

@@ -140,7 +140,7 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
     fetchAll();
   }
 
-  const isOwner = session?.user?.role === "OWNER";
+  const isOwner = (session?.user?.role === "OWNER" || session?.user?.role === "DEVELOPER");
 
   function openPurchase(record?: FeedPurchase) {
     purchaseForm.reset(record ? { date: record.date.split("T")[0], feedProductId: record.feedProductId, qty: record.qty, pricePerKg: record.pricePerKg ?? "", notes: record.notes ?? "" } : { date: todayISO(), feedProductId: "", qty: 0, pricePerKg: "", notes: "" });

@@ -1,4 +1,4 @@
-export type UserRole = "OWNER" | "STAFF";
+export type UserRole = "DEVELOPER" | "OWNER" | "STAFF";
 export type MedCategory = "MEDICINE" | "VACCINE";
 export type NotificationType =
   | "LOW_EGG_STOCK"
@@ -166,6 +166,8 @@ export interface User {
   email: string;
   role: UserRole;
   isActive: boolean;
+  companyName?: string | null;
+  password?: string;
   createdAt: string;
 }
 

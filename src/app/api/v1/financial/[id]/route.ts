@@ -10,7 +10,7 @@ export async function PUT(
   try {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    if (session.user.role !== "OWNER") return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
+    if (session.user.role !== "OWNER" && session.user.role !== "DEVELOPER") return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
     const { id } = await params;
     const body = await request.json();
@@ -35,7 +35,7 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    if (session.user.role !== "OWNER") return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
+    if (session.user.role !== "OWNER" && session.user.role !== "DEVELOPER") return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
     const { id } = await params;
     await deleteFinancialNote(id);

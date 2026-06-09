@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function FinancialPage() {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "OWNER") redirect("/dashboard");
+  if (!session || session.user.role !== "OWNER" && session.user.role !== "DEVELOPER") redirect("/dashboard");
 
   const [result, summary] = await Promise.all([
     getFinancialNotes({ limit: 100 }),

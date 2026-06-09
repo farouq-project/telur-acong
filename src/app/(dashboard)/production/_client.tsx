@@ -214,6 +214,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [pageSize, setPageSize] = useState<"50" | "100" | "200" | "all">("50");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function toggleFilterHouse(name: string) {
@@ -239,22 +240,22 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
       if (filterHouses.length > 0) params.set("houses", filterHouses.join(","));
       if (dateFrom) params.set("from", dateFrom);
       if (dateTo) params.set("to", dateTo);
-      // Saat ada filter aktif, ambil seluruh data yang cocok (bukan hanya 50 terbaru)
-      // agar pemfilteran benar-benar mencakup semua data, bukan hanya halaman pertama.
-      params.set("limit", hasActiveFilter ? "5000" : "50");
+      // Saat ada filter aktif selalu ambil semua data yang cocok; saat tidak ada
+      // filter gunakan pageSize yang dipilih pengguna.
+      const limit = hasActiveFilter ? "5000" : pageSize === "all" ? "5000" : pageSize;
+      params.set("limit", limit);
       const res = await fetch(`/api/v1/production?${params}`);
       const json = await res.json();
       setRecords(json.data ?? []);
     } finally {
       setFetching(false);
     }
-  }, [search, filterHouses, dateFrom, dateTo, hasActiveFilter]);
+  }, [search, filterHouses, dateFrom, dateTo, hasActiveFilter, pageSize]);
 
   useEffect(() => {
-    if (hasActiveFilter) fetchData();
-    else if (records !== initialData) fetchData();
+    fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, filterHouses, dateFrom, dateTo]);
+  }, [search, filterHouses, dateFrom, dateTo, pageSize]);
 
   const displayRecords = useMemo(() => {
     return [...records].sort((a, b) =>
@@ -443,7 +444,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
     }
   }
 
-  const isOwner = session?.user?.role === "OWNER";
+  const isOwner = (session?.user?.role === "OWNER" || session?.user?.role === "DEVELOPER");
 
   const watchedDate = form.watch("date");
   const watchedHouse = form.watch("house");
@@ -589,6 +590,22 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
             <ArrowUpDown className="w-3.5 h-3.5" />
             {sortDir === "asc" ? "Tanggal Terlama" : "Tanggal Terbaru"}
           </Button>
+
+          <div className="flex items-center gap-0.5 border border-gray-200 rounded-lg overflow-hidden shrink-0">
+            {(["50", "100", "200", "all"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setPageSize(v)}
+                className={`px-2 h-9 text-xs font-medium transition-colors ${
+                  pageSize === v
+                    ? "bg-green-600 text-white"
+                    : "bg-white text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                {v === "all" ? "Semua" : v}
+              </button>
+            ))}
+          </div>
 
           {isOwner && (
             <Button

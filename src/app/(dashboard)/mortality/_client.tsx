@@ -100,7 +100,7 @@ export default function MortalityClient({ initialData }: Props) {
     fetchData();
   }
 
-  const isOwner = session?.user?.role === "OWNER";
+  const isOwner = (session?.user?.role === "OWNER" || session?.user?.role === "DEVELOPER");
 
   return (
     <>

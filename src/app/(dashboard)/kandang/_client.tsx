@@ -113,7 +113,7 @@ export default function KandangClient({ initialData }: Props) {
     }
   }
 
-  const isOwner = session?.user?.role === "OWNER";
+  const isOwner = (session?.user?.role === "OWNER" || session?.user?.role === "DEVELOPER");
 
   const filtered = houses.filter((h) => h.name.toLowerCase().includes(search.toLowerCase()));
 

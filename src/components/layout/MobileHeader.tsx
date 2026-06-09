@@ -23,9 +23,12 @@ export function MobileHeader({ title }: MobileHeaderProps) {
   const { data: session } = useSession();
   const [unreadCount, setUnreadCount] = useState(0);
 
+  const companyName = session?.user?.companyName;
+  const isDeveloper = session?.user?.role === "DEVELOPER";
+  const canManageUsers = isDeveloper || session?.user?.role === "OWNER";
+
   useEffect(() => {
     fetchUnreadCount();
-    // Refresh every 30 seconds
     const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -44,10 +47,15 @@ export function MobileHeader({ title }: MobileHeaderProps) {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-200">
-      <div className="flex items-center justify-between px-4 h-14">
-        <h1 className="text-base font-semibold text-gray-900 truncate max-w-[200px]">
+      <div className="flex items-center justify-between px-4 h-14 relative">
+        <h1 className="text-base font-semibold text-gray-900 truncate max-w-[130px]">
           {title}
         </h1>
+        {companyName && (
+          <span className="absolute left-1/2 -translate-x-1/2 text-xs font-semibold text-green-700 truncate max-w-[130px] pointer-events-none">
+            {companyName}
+          </span>
+        )}
 
         <div className="flex items-center gap-1">
           {/* Notification Bell */}
@@ -72,11 +80,7 @@ export function MobileHeader({ title }: MobileHeaderProps) {
           {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-9 px-2 gap-1.5"
-              >
+              <Button variant="ghost" size="sm" className="h-9 px-2 gap-1.5">
                 <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
                   <User className="w-3.5 h-3.5 text-green-700" />
                 </div>
@@ -94,13 +98,15 @@ export function MobileHeader({ title }: MobileHeaderProps) {
                 </p>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/settings/password">
-                  <Settings className="w-4 h-4 mr-2" />
-                  Ganti Password
-                </Link>
-              </DropdownMenuItem>
-              {session?.user?.role === "OWNER" && (
+              {isDeveloper && (
+                <DropdownMenuItem asChild>
+                  <Link href="/settings/password">
+                    <Settings className="w-4 h-4 mr-2" />
+                    Ganti Password
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {canManageUsers && (
                 <DropdownMenuItem asChild>
                   <Link href="/settings/users">
                     <User className="w-4 h-4 mr-2" />
@@ -123,3 +129,4 @@ export function MobileHeader({ title }: MobileHeaderProps) {
     </header>
   );
 }
+

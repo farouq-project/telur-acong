@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -24,6 +26,8 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export default function PasswordPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [showCurrent, setShowCurrent] = useState(false);
@@ -33,6 +37,12 @@ export default function PasswordPage() {
     resolver: zodResolver(schema),
     defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
   });
+
+  if (status === "loading") return null;
+  if (session?.user?.role !== "DEVELOPER") {
+    router.replace("/dashboard");
+    return null;
+  }
 
   async function onSubmit(data: FormData) {
     setLoading(true);

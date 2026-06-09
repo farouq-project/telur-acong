@@ -51,7 +51,7 @@ const settingsItems = {
 
 export default function MorePage() {
   const { data: session } = useSession();
-  const isOwner = session?.user?.role === "OWNER";
+  const isOwner = (session?.user?.role === "OWNER" || session?.user?.role === "DEVELOPER");
 
   const sections = [...menuItems];
   if (isOwner) sections.push(ownerItems);

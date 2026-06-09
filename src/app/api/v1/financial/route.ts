@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    if (session.user.role !== "OWNER") return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
+    if (session.user.role !== "OWNER" && session.user.role !== "DEVELOPER") return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
     const { searchParams } = new URL(request.url);
     const from = searchParams.get("from") ?? undefined;
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    if (session.user.role !== "OWNER") return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
+    if (session.user.role !== "OWNER" && session.user.role !== "DEVELOPER") return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
 
     const body = await request.json();
     const { date, type, amount, description } = body;
