@@ -12,7 +12,7 @@ export default withAuth(
       pathname.startsWith(route)
     );
 
-    if (isOwnerRoute && token?.role !== "OWNER") {
+    if (isOwnerRoute && token?.role !== "OWNER" && token?.role !== "DEVELOPER") {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
 

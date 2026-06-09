@@ -7,8 +7,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import * as XLSX from "xlsx";
 import {
-  Plus, Search, Edit2, Trash2, Loader2, X, FileSpreadsheet, Download, Upload, ListFilter, ArrowUpDown,
-  ListChecks, CheckSquare, Square,
+  Plus, Search, Edit2, Trash2, Loader2, X, FileSpreadsheet, Download, Upload, ListFilter,
+  ArrowUpDown, ArrowUp, ArrowDown, ListChecks, CheckSquare, Square,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { id } from "date-fns/locale";
@@ -17,7 +17,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -191,6 +190,126 @@ function computeMetrics(r: EggProduction) {
   return { hd, feedIntake, fcr, hpp };
 }
 
+const TABLE_COLS: { key: string; label: string; align?: "right" }[] = [
+  { key: "date",         label: "Tanggal" },
+  { key: "house",        label: "Kandang" },
+  { key: "goodEggs",     label: "Bagus (btr)", align: "right" },
+  { key: "crackedEggs",  label: "Retak (btr)", align: "right" },
+  { key: "goodEggsKg",   label: "Bagus (kg)",  align: "right" },
+  { key: "crackedEggsKg",label: "Retak (kg)",  align: "right" },
+  { key: "feedQtyKg",    label: "Pakan (kg)",  align: "right" },
+  { key: "populasi",     label: "Populasi",    align: "right" },
+  { key: "mortality",    label: "Mati",        align: "right" },
+  { key: "hd",           label: "HD %",        align: "right" },
+  { key: "fi",           label: "FI",          align: "right" },
+  { key: "fcr",          label: "FCR",         align: "right" },
+];
+
+function SortIcon({ col, sortCol, sortDir }: { col: string; sortCol: string; sortDir: "asc" | "desc" }) {
+  if (col !== sortCol) return <ArrowUpDown className="w-3 h-3 text-gray-300 ml-0.5 inline-block" />;
+  return sortDir === "asc"
+    ? <ArrowUp className="w-3 h-3 text-green-600 ml-0.5 inline-block" />
+    : <ArrowDown className="w-3 h-3 text-green-600 ml-0.5 inline-block" />;
+}
+
+function ProductionTable({
+  records, sortCol, sortDir, selectMode, selectedIds, isOwner,
+  onSort, onToggleSelected, onEdit, onDelete,
+}: {
+  records: EggProduction[];
+  sortCol: string;
+  sortDir: "asc" | "desc";
+  selectMode: boolean;
+  selectedIds: string[];
+  isOwner: boolean;
+  onSort: (col: string) => void;
+  onToggleSelected: (id: string) => void;
+  onEdit: (r: EggProduction) => void;
+  onDelete: (id: string) => void;
+}) {
+  const thBase = "px-2 py-2 font-semibold text-gray-600 whitespace-nowrap select-none cursor-pointer hover:bg-gray-100 active:bg-gray-200 border-b border-gray-200";
+
+  return (
+    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+      <table className="w-full border-collapse text-[11px]" style={{ minWidth: 900 }}>
+        <thead className="bg-gray-50 sticky top-0 z-10">
+          <tr>
+            {selectMode && <th className="w-8 px-2 py-2 border-b border-gray-200" />}
+            {TABLE_COLS.map((col) => (
+              <th
+                key={col.key}
+                className={`${thBase} ${col.align === "right" ? "text-right" : "text-left"}`}
+                onClick={() => onSort(col.key)}
+              >
+                {col.label}
+                <SortIcon col={col.key} sortCol={sortCol} sortDir={sortDir} />
+              </th>
+            ))}
+            <th className="px-2 py-2 text-left font-semibold text-gray-600 border-b border-gray-200 whitespace-nowrap">Catatan</th>
+            <th className="px-2 py-2 border-b border-gray-200 w-16" />
+          </tr>
+        </thead>
+        <tbody>
+          {records.map((r, idx) => {
+            const { hd, feedIntake, fcr } = computeMetrics(r);
+            const isSelected = selectedIds.includes(r.id);
+            const rowCls = [
+              idx % 2 === 1 ? "bg-gray-50/60" : "bg-white",
+              isSelected ? "!bg-green-50" : "",
+              selectMode ? "cursor-pointer" : "",
+              "border-b border-gray-100 hover:bg-blue-50/30 transition-colors",
+            ].join(" ");
+
+            return (
+              <tr key={r.id} className={rowCls} onClick={selectMode ? () => onToggleSelected(r.id) : undefined}>
+                {selectMode && (
+                  <td className="px-2 py-1.5 text-center" onClick={(e) => { e.stopPropagation(); onToggleSelected(r.id); }}>
+                    {isSelected
+                      ? <CheckSquare className="w-4 h-4 text-green-600 inline" />
+                      : <Square className="w-4 h-4 text-gray-300 inline" />}
+                  </td>
+                )}
+                <td className="px-2 py-1.5 whitespace-nowrap text-gray-500">{formatDate(r.date)}</td>
+                <td className="px-2 py-1.5 whitespace-nowrap font-medium text-gray-800">{r.house}</td>
+                <td className="px-2 py-1.5 text-right font-mono text-green-700 font-semibold">{formatNumber(r.goodEggs)}</td>
+                <td className="px-2 py-1.5 text-right font-mono text-yellow-600">{r.crackedEggs > 0 ? r.crackedEggs : <span className="text-gray-300">—</span>}</td>
+                <td className="px-2 py-1.5 text-right font-mono">{r.goodEggsKg != null ? r.goodEggsKg : <span className="text-gray-300">—</span>}</td>
+                <td className="px-2 py-1.5 text-right font-mono">{r.crackedEggsKg != null ? r.crackedEggsKg : <span className="text-gray-300">—</span>}</td>
+                <td className="px-2 py-1.5 text-right font-mono text-amber-600">{r.feedQtyKg != null ? r.feedQtyKg : <span className="text-gray-300">—</span>}</td>
+                <td className="px-2 py-1.5 text-right font-mono">{r.populasi != null ? formatNumber(r.populasi) : <span className="text-gray-300">—</span>}</td>
+                <td className="px-2 py-1.5 text-right font-mono text-red-500">{r.mortality != null && r.mortality > 0 ? r.mortality : <span className="text-gray-300">—</span>}</td>
+                <td className="px-2 py-1.5 text-right font-mono text-blue-600">{hd !== null ? hd.toFixed(1) : <span className="text-gray-300">—</span>}</td>
+                <td className="px-2 py-1.5 text-right font-mono text-amber-700">{feedIntake !== null ? feedIntake.toFixed(3) : <span className="text-gray-300">—</span>}</td>
+                <td className="px-2 py-1.5 text-right font-mono text-purple-600">{fcr !== null ? fcr.toFixed(3) : <span className="text-gray-300">—</span>}</td>
+                <td className="px-2 py-1.5 max-w-[100px]">
+                  <span className="truncate block text-gray-400">{r.notes ?? ""}</span>
+                </td>
+                <td className="px-2 py-1.5">
+                  {!selectMode && (
+                    <div className="flex gap-0.5 justify-end">
+                      <button onClick={(e) => { e.stopPropagation(); onEdit(r); }} className="p-1 rounded hover:bg-gray-100">
+                        <Edit2 className="w-3.5 h-3.5 text-gray-400" />
+                      </button>
+                      {isOwner && (
+                        <button onClick={(e) => { e.stopPropagation(); onDelete(r.id); }} className="p-1 rounded hover:bg-red-50">
+                          <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div className="px-3 py-1.5 text-[10px] text-gray-400 border-t border-gray-100">
+        {records.length} baris
+      </div>
+    </div>
+  );
+}
+
 export default function ProductionClient({ initialData, houses, feedProducts }: Props) {
   const { data: session } = useSession();
   const { toast } = useToast();
@@ -209,6 +328,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
   const [filterHouses, setFilterHouses] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [sortCol, setSortCol] = useState<string>("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -258,12 +378,29 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
   }, [search, filterHouses, dateFrom, dateTo, pageSize]);
 
   const displayRecords = useMemo(() => {
-    return [...records].sort((a, b) =>
-      sortDir === "asc"
-        ? new Date(a.date).getTime() - new Date(b.date).getTime()
-        : new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-  }, [records, sortDir]);
+    return [...records].sort((a, b) => {
+      let av: number | string | null = null;
+      let bv: number | string | null = null;
+      if (sortCol === "date") { av = a.date; bv = b.date; }
+      else if (sortCol === "house") { av = a.house; bv = b.house; }
+      else if (sortCol === "goodEggs") { av = a.goodEggs; bv = b.goodEggs; }
+      else if (sortCol === "crackedEggs") { av = a.crackedEggs; bv = b.crackedEggs; }
+      else if (sortCol === "goodEggsKg") { av = a.goodEggsKg ?? null; bv = b.goodEggsKg ?? null; }
+      else if (sortCol === "crackedEggsKg") { av = a.crackedEggsKg ?? null; bv = b.crackedEggsKg ?? null; }
+      else if (sortCol === "feedQtyKg") { av = a.feedQtyKg ?? null; bv = b.feedQtyKg ?? null; }
+      else if (sortCol === "populasi") { av = a.populasi ?? null; bv = b.populasi ?? null; }
+      else if (sortCol === "mortality") { av = a.mortality ?? null; bv = b.mortality ?? null; }
+      else if (sortCol === "hd") { av = computeMetrics(a).hd; bv = computeMetrics(b).hd; }
+      else if (sortCol === "fi") { av = computeMetrics(a).feedIntake; bv = computeMetrics(b).feedIntake; }
+      else if (sortCol === "fcr") { av = computeMetrics(a).fcr; bv = computeMetrics(b).fcr; }
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      if (typeof av === "string" && typeof bv === "string") {
+        return sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+      }
+      return sortDir === "asc" ? (av as number) - (bv as number) : (bv as number) - (av as number);
+    });
+  }, [records, sortCol, sortDir]);
 
   const defaultValues = {
     date: todayISO(), house: "", goodEggs: 0, crackedEggs: 0,
@@ -581,17 +718,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
             </button>
           )}
 
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 gap-1.5 text-xs ml-auto shrink-0"
-            onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
-          >
-            <ArrowUpDown className="w-3.5 h-3.5" />
-            {sortDir === "asc" ? "Tanggal Terlama" : "Tanggal Terbaru"}
-          </Button>
-
-          <div className="flex items-center gap-0.5 border border-gray-200 rounded-lg overflow-hidden shrink-0">
+          <div className="flex items-center gap-0.5 border border-gray-200 rounded-lg overflow-hidden shrink-0 ml-auto">
             {(["50", "100", "200", "all"] as const).map((v) => (
               <button
                 key={v}
@@ -635,8 +762,8 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
         )}
 
         {fetching ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)}
+          <div className="space-y-2">
+            {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-9 w-full rounded" />)}
           </div>
         ) : records.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
@@ -649,77 +776,21 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
             <p className="text-sm">Tidak ada data yang cocok dengan filter</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {displayRecords.map((r) => {
-              const { hd, feedIntake, fcr, hpp } = computeMetrics(r);
-              const isSelected = selectedIds.includes(r.id);
-              return (
-                <div
-                  key={r.id}
-                  className={`bg-white rounded-xl p-4 border shadow-sm flex gap-2 ${isSelected ? "border-green-300 bg-green-50/40" : "border-gray-100"}`}
-                  onClick={selectMode ? () => toggleSelected(r.id) : undefined}
-                >
-                  {selectMode && (
-                    <button onClick={(e) => { e.stopPropagation(); toggleSelected(r.id); }} className="shrink-0 pt-0.5">
-                      {isSelected ? (
-                        <CheckSquare className="w-5 h-5 text-green-600" />
-                      ) : (
-                        <Square className="w-5 h-5 text-gray-300" />
-                      )}
-                    </button>
-                  )}
-                  <div className="flex items-start justify-between flex-1 min-w-0">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs text-gray-400">{formatDate(r.date)}</span>
-                        <Badge variant="secondary" className="text-xs">{r.house}</Badge>
-                        {r.populasi && <span className="text-xs text-gray-400">{formatNumber(r.populasi)} ekor</span>}
-                      </div>
-                      <div className="flex flex-wrap gap-2 text-sm">
-                        <span className="text-green-700 font-semibold">{formatNumber(r.goodEggs)} bagus</span>
-                        {r.goodEggsKg && <span className="text-green-600 text-xs">({r.goodEggsKg} kg)</span>}
-                        {r.crackedEggs > 0 && <span className="text-yellow-600">{r.crackedEggs} retak</span>}
-                        {r.rejectedEggs > 0 && <span className="text-red-500">{r.rejectedEggs} BS</span>}
-                        {r.mortality && r.mortality > 0 && <span className="text-red-600 text-xs">✝ {r.mortality} mati</span>}
-                      </div>
-                      {r.feedQtyKg && (
-                        <p className="text-xs text-amber-600 mt-1">Pakan: {r.feedQtyKg} kg</p>
-                      )}
-                      {(hd !== null || feedIntake !== null || fcr !== null || hpp !== null) && (
-                        <div className="flex flex-wrap gap-2 mt-1.5">
-                          {hd !== null && (
-                            <span className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">HD {hd.toFixed(1)}%</span>
-                          )}
-                          {feedIntake !== null && (
-                            <span className="text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">FI {feedIntake.toFixed(3)} kg/ekor</span>
-                          )}
-                          {fcr !== null && (
-                            <span className="text-xs bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded">FCR {fcr.toFixed(5)}</span>
-                          )}
-                          {hpp !== null && (
-                            <span className="text-xs bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded">HPP Rp{formatNumber(Math.round(hpp))}/kg</span>
-                          )}
-                        </div>
-                      )}
-                      {r.notes && <p className="text-xs text-gray-400 mt-1 truncate">{r.notes}</p>}
-                    </div>
-                    {!selectMode && (
-                      <div className="flex gap-1 ml-2">
-                        <button onClick={() => openEdit(r)} className="p-2 rounded-lg hover:bg-gray-100 active:bg-gray-200">
-                          <Edit2 className="w-4 h-4 text-gray-400" />
-                        </button>
-                        {isOwner && (
-                          <button onClick={() => setDeleteId(r.id)} className="p-2 rounded-lg hover:bg-red-50 active:bg-red-100">
-                            <Trash2 className="w-4 h-4 text-red-400" />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <ProductionTable
+            records={displayRecords}
+            sortCol={sortCol}
+            sortDir={sortDir}
+            selectMode={selectMode}
+            selectedIds={selectedIds}
+            isOwner={isOwner}
+            onSort={(col) => {
+              if (sortCol === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+              else { setSortCol(col); setSortDir("asc"); }
+            }}
+            onToggleSelected={toggleSelected}
+            onEdit={openEdit}
+            onDelete={(id) => setDeleteId(id)}
+          />
         )}
       </div>
 
