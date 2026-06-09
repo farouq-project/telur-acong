@@ -62,6 +62,7 @@ model EggProduction {
   feedPricePerKg Decimal? @db.Decimal(12, 2)
   feedProductId  String?
   mortality      Int?
+  umurAyam       Int?
   notes          String?  @db.Text
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

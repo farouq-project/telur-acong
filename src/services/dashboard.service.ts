@@ -1,4 +1,4 @@
-import { getTodayProduction, getMonthlyProduction, getProductionTrend, getProductionTrendByHouse, getDailyMetrics } from "./production.service";
+import { getTodayProduction, getMonthlyProduction, getProductionTrend, getProductionTrendByHouse, getDailyMetrics, getTodayCrackedEggs } from "./production.service";
 import { getTodaySales, getMonthlySales, getSalesTrend } from "./sales.service";
 import { getEggStock, getFeedStock } from "./stock.service";
 import { getTodayMortality, getMonthlyMortality, getMortalityTrend } from "./mortality.service";
@@ -22,6 +22,7 @@ export async function getDashboardStats() {
     feedStocks,
     dailyMetrics,
     houses,
+    todayCrackedEggs,
   ] = await Promise.all([
     getEggStock(),
     getTodayProduction(),
@@ -38,6 +39,7 @@ export async function getDashboardStats() {
     getFeedStock(),
     getDailyMetrics(),
     getHouses(),
+    getTodayCrackedEggs(),
   ]);
 
   return {
@@ -55,6 +57,7 @@ export async function getDashboardStats() {
     mortalityTrend,
     feedStocks,
     dailyMetrics,
+    todayCrackedEggs,
     houseNames: houses.map((h) => h.name),
   };
 }

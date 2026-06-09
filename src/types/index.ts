@@ -31,6 +31,7 @@ export interface EggProduction {
   feedPricePerKg?: number | null;
   feedProductId?: string | null;
   mortality?: number | null;
+  umurAyam?: number | null;
   notes?: string | null;
   createdAt: string;
   updatedAt?: string;
@@ -179,6 +180,7 @@ export interface DashboardStats {
   monthlyProduction: number;
   monthlySales: number;
   monthlyMortality: number;
+  todayCrackedEggs: { butir: number; kgTotal: number };
   upcomingVaccinations: VaccinationSchedule[];
   productionTrend: { date: string; value: number }[];
   salesTrend: { date: string; value: number }[];

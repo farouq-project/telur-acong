@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { Egg, Wheat, TrendingDown, TrendingUp, RefreshCw, History, PackagePlus } from "lucide-react";
+import { Egg, Wheat, TrendingDown, TrendingUp, RefreshCw, History, PackagePlus, EggOff } from "lucide-react";
 import { MobileHeader } from "@/components/layout/MobileHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import type { FeedStockItem, EggStockBreakdown } from "@/services/stock.service"
 interface StockData {
   eggStock: EggStockBreakdown;
   feedStocks: FeedStockItem[];
+  todayCrackedEggs: { butir: number; kgTotal: number };
 }
 
 interface Props {
@@ -104,6 +105,22 @@ export default function StockClient({ initialData }: Props) {
                 </p>
               </div>
             </div>
+            {(data.todayCrackedEggs.butir > 0 || data.todayCrackedEggs.kgTotal > 0) && (
+              <div className="mt-2 bg-orange-50 rounded-xl p-3 flex items-center gap-3">
+                <EggOff className="w-4 h-4 text-orange-500 shrink-0" />
+                <div>
+                  <p className="text-xs text-orange-600 font-medium">Telur Retak Hari Ini</p>
+                  <p className="text-sm font-bold text-orange-700">
+                    {formatNumber(data.todayCrackedEggs.butir)} butir
+                    {data.todayCrackedEggs.kgTotal > 0 && (
+                      <span className="text-xs font-normal text-orange-400 ml-2">
+                        ({formatNumber(data.todayCrackedEggs.kgTotal)} kg)
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+            )}
             <p className="text-xs text-gray-400 mt-3">
               Stok saat ini = stok kemarin ({formatNumber(data.eggStock.previousStock)} kg) + produksi hari ini ({formatNumber(data.eggStock.todayProduced)} kg) − terjual hari ini ({formatNumber(data.eggStock.todaySold)} kg) = <span className="font-medium text-gray-600">{formatNumber(data.eggStock.currentStock)} kg</span>
             </p>

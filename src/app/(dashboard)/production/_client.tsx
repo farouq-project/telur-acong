@@ -166,6 +166,7 @@ const schema = z.object({
   feedQtyKg: z.coerce.number().min(0).optional().or(z.literal("")),
   feedProductId: z.string().optional().or(z.literal("")),
   mortality: z.coerce.number().min(0).optional().or(z.literal("")),
+  umurAyam: z.coerce.number().min(0).optional().or(z.literal("")),
   notes: z.string().optional(),
 });
 
@@ -200,6 +201,7 @@ const TABLE_COLS: { key: string; label: string; align?: "right" }[] = [
   { key: "feedQtyKg",    label: "Pakan (kg)",  align: "right" },
   { key: "populasi",     label: "Populasi",    align: "right" },
   { key: "mortality",    label: "Mati",        align: "right" },
+  { key: "umurAyam",     label: "Umur (hr)",   align: "right" },
   { key: "hd",           label: "HD %",        align: "right" },
   { key: "fi",           label: "FI",          align: "right" },
   { key: "fcr",          label: "FCR",         align: "right" },
@@ -278,6 +280,7 @@ function ProductionTable({
                 <td className="px-2 py-1.5 text-right font-mono text-amber-600">{r.feedQtyKg != null ? r.feedQtyKg : <span className="text-gray-300">—</span>}</td>
                 <td className="px-2 py-1.5 text-right font-mono">{r.populasi != null ? formatNumber(r.populasi) : <span className="text-gray-300">—</span>}</td>
                 <td className="px-2 py-1.5 text-right font-mono text-red-500">{r.mortality != null && r.mortality > 0 ? r.mortality : <span className="text-gray-300">—</span>}</td>
+                <td className="px-2 py-1.5 text-right font-mono text-gray-600">{r.umurAyam != null ? r.umurAyam : <span className="text-gray-300">—</span>}</td>
                 <td className="px-2 py-1.5 text-right font-mono text-blue-600">{hd !== null ? hd.toFixed(1) : <span className="text-gray-300">—</span>}</td>
                 <td className="px-2 py-1.5 text-right font-mono text-amber-700">{feedIntake !== null ? feedIntake.toFixed(3) : <span className="text-gray-300">—</span>}</td>
                 <td className="px-2 py-1.5 text-right font-mono text-purple-600">{fcr !== null ? fcr.toFixed(3) : <span className="text-gray-300">—</span>}</td>
@@ -346,7 +349,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
     defaultValues: {
       date: todayISO(), house: "", goodEggs: 0, crackedEggs: 0,
       populasi: "", goodEggsKg: "", crackedEggsKg: "",
-      feedQtyKg: "", feedProductId: "", mortality: "", notes: "",
+      feedQtyKg: "", feedProductId: "", mortality: "", umurAyam: "", notes: "",
     },
   });
 
@@ -390,6 +393,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
       else if (sortCol === "feedQtyKg") { av = a.feedQtyKg ?? null; bv = b.feedQtyKg ?? null; }
       else if (sortCol === "populasi") { av = a.populasi ?? null; bv = b.populasi ?? null; }
       else if (sortCol === "mortality") { av = a.mortality ?? null; bv = b.mortality ?? null; }
+      else if (sortCol === "umurAyam") { av = a.umurAyam ?? null; bv = b.umurAyam ?? null; }
       else if (sortCol === "hd") { av = computeMetrics(a).hd; bv = computeMetrics(b).hd; }
       else if (sortCol === "fi") { av = computeMetrics(a).feedIntake; bv = computeMetrics(b).feedIntake; }
       else if (sortCol === "fcr") { av = computeMetrics(a).fcr; bv = computeMetrics(b).fcr; }
@@ -406,7 +410,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
     date: todayISO(), house: "", goodEggs: 0, crackedEggs: 0,
     populasi: "" as const, goodEggsKg: "" as const, crackedEggsKg: "" as const,
     feedQtyKg: "" as const, feedProductId: "" as const,
-    mortality: "" as const, notes: "",
+    mortality: "" as const, umurAyam: "" as const, notes: "",
   };
 
   function openCreate() {
@@ -427,6 +431,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
       feedQtyKg: record.feedQtyKg ?? "",
       feedProductId: record.feedProductId ?? "",
       mortality: record.mortality ?? "",
+      umurAyam: record.umurAyam ?? "",
       notes: record.notes ?? "",
     });
     setEditingId(record.id);
@@ -446,6 +451,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
         feedQtyKg: data.feedQtyKg !== "" ? data.feedQtyKg : null,
         feedProductId: data.feedProductId !== "" ? data.feedProductId : null,
         mortality: data.mortality !== "" ? data.mortality : null,
+        umurAyam: data.umurAyam !== "" ? data.umurAyam : null,
       };
       const res = await fetch(url, {
         method,
@@ -618,6 +624,24 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedHouse, watchedMortality, editingId, records, houses]);
+
+  // Auto-isi Umur Ayam = umur ayam catatan sebelumnya + selisih hari
+  useEffect(() => {
+    if (editingId) return;
+    if (!watchedHouse || !watchedDate) return;
+
+    const previousRecord = records
+      .filter((r) => r.house.trim().toLowerCase() === watchedHouse.trim().toLowerCase() && r.umurAyam != null)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
+    if (previousRecord?.umurAyam != null) {
+      const daysDiff = Math.round(
+        (new Date(watchedDate).getTime() - new Date(previousRecord.date).getTime()) / 86400000
+      );
+      form.setValue("umurAyam", Math.max(0, previousRecord.umurAyam + daysDiff));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedHouse, watchedDate, editingId, records]);
 
   return (
     <>
@@ -878,7 +902,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Populasi (ekor)</Label>
                   <Input type="number" min="0" className="h-11" placeholder="0" {...form.register("populasi")} />
@@ -886,6 +910,10 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
                 <div className="space-y-1.5">
                   <Label className="text-xs">Kematian (ekor)</Label>
                   <Input type="number" min="0" className="h-11" placeholder="0" {...form.register("mortality")} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Umur Ayam (hr)</Label>
+                  <Input type="number" min="0" className="h-11" placeholder="0" {...form.register("umurAyam")} />
                 </div>
               </div>
 

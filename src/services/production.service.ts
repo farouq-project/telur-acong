@@ -16,6 +16,7 @@ export interface CreateProductionInput {
   feedPricePerKg?: number;
   feedProductId?: string;
   mortality?: number;
+  umurAyam?: number;
   notes?: string;
 }
 
@@ -34,6 +35,7 @@ function serializeRecord(r: {
   feedPricePerKg: unknown;
   feedProductId: string | null;
   mortality: number | null;
+  umurAyam: number | null;
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -187,6 +189,7 @@ function buildProductionData(input: CreateProductionInput) {
     feedPricePerKg: input.feedPricePerKg ?? null,
     feedProductId: input.feedProductId ?? null,
     mortality: input.mortality ?? null,
+    umurAyam: input.umurAyam ?? null,
     notes: input.notes ?? null,
   };
 }
@@ -248,6 +251,7 @@ export async function updateProduction(
         ...(input.feedPricePerKg !== undefined && { feedPricePerKg: input.feedPricePerKg }),
         ...(input.feedProductId !== undefined && { feedProductId: input.feedProductId }),
         ...(input.mortality !== undefined && { mortality: input.mortality }),
+        ...(input.umurAyam !== undefined && { umurAyam: input.umurAyam }),
         ...(input.notes !== undefined && { notes: input.notes }),
       },
     });
@@ -271,6 +275,22 @@ export async function deleteProductions(ids: string[]) {
   // FeedUsage terhubung dihapus otomatis lewat onDelete: Cascade pada relasi productionId
   const result = await prisma.eggProduction.deleteMany({ where: { id: { in: ids } } });
   return result.count;
+}
+
+export async function getTodayCrackedEggs(): Promise<{ butir: number; kgTotal: number }> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+
+  const result = await prisma.eggProduction.aggregate({
+    where: { date: { gte: today, lt: tomorrow } },
+    _sum: { crackedEggs: true, crackedEggsKg: true },
+  });
+  return {
+    butir: result._sum.crackedEggs ?? 0,
+    kgTotal: result._sum.crackedEggsKg != null ? decimalToNumber(result._sum.crackedEggsKg) : 0,
+  };
 }
 
 export async function getTodayProduction(): Promise<number> {
