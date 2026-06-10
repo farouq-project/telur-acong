@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, email, password, role, companyName, notes } = body;
+    const { name, email, password, role, companyName, notes, logoUrl } = body;
 
     if (!name || !email || !password) {
       return NextResponse.json({ error: "Data tidak lengkap" }, { status: 400 });
@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
       role: role ?? "STAFF",
       companyName: companyName || undefined,
       notes: notes || undefined,
+      logoUrl: logoUrl || null,
     });
 
     return NextResponse.json({ success: true, data }, { status: 201 });

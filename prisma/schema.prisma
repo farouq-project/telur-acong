@@ -39,6 +39,7 @@ model User {
   isActive    Boolean  @default(true)
   companyName String?
   notes       String?  @db.Text
+  logoUrl     String?  @db.LongText
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

@@ -154,14 +154,23 @@ export async function getTotalEggsSold(): Promise<number> {
   return decimalToNumber(result._sum.qtySold);
 }
 
-export async function getEggSalesByType(): Promise<{ telurBagusKg: number; telurRetakKg: number }> {
+export async function getEggSalesByType(params?: { from?: string; to?: string }): Promise<{ telurBagusKg: number; telurRetakKg: number }> {
+  const { from, to } = params ?? {};
+  const dateFilter = from || to
+    ? {
+        date: {
+          ...(from && { gte: new Date(from) }),
+          ...(to && { lte: new Date(to) }),
+        },
+      }
+    : {};
   const [bagus, retak] = await Promise.all([
     prisma.eggSale.aggregate({
-      where: { eggType: "TELUR_BAGUS" },
+      where: { eggType: "TELUR_BAGUS", ...dateFilter },
       _sum: { qtySold: true },
     }),
     prisma.eggSale.aggregate({
-      where: { eggType: "TELUR_RETAK" },
+      where: { eggType: "TELUR_RETAK", ...dateFilter },
       _sum: { qtySold: true },
     }),
   ]);

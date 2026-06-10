@@ -5,7 +5,7 @@ import { getTodayMortality, getMonthlyMortality, getMortalityTrend } from "./mor
 import { getUpcomingVaccinations } from "./vaccination.service";
 import { getHouses } from "./house.service";
 
-export async function getDashboardStats() {
+export async function getDashboardStats(reportRange?: { from?: string; to?: string }) {
   const [
     eggStock,
     todayProduction,
@@ -42,8 +42,8 @@ export async function getDashboardStats() {
     getDailyMetrics(),
     getHouses(),
     getTodayCrackedEggs(),
-    getProductionReportByHouse(),
-    getEggSalesByType(),
+    getProductionReportByHouse(reportRange),
+    getEggSalesByType(reportRange),
   ]);
 
   const totalTelurBagusKg = houseReport.reduce((sum, h) => sum + h.telurBagusKg, 0);

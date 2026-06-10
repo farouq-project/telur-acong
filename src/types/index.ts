@@ -172,6 +172,7 @@ export interface User {
   isActive: boolean;
   companyName?: string | null;
   notes?: string | null;
+  logoUrl?: string | null;
   password?: string;
   createdAt: string;
 }

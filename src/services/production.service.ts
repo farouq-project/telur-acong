@@ -378,8 +378,19 @@ export interface HouseReport {
 
 // Ringkasan per kandang untuk dashboard: Populasi diambil dari catatan terakhir
 // (urut tanggal), sedangkan Mati/Pakan/Telur Bagus/Telur Retak adalah total kumulatif.
-export async function getProductionReportByHouse(): Promise<HouseReport[]> {
+export async function getProductionReportByHouse(params?: { from?: string; to?: string }): Promise<HouseReport[]> {
+  const { from, to } = params ?? {};
   const records = await prisma.eggProduction.findMany({
+    where: {
+      ...(from || to
+        ? {
+            date: {
+              ...(from && { gte: new Date(from) }),
+              ...(to && { lte: new Date(to) }),
+            },
+          }
+        : {}),
+    },
     select: {
       house: true,
       date: true,

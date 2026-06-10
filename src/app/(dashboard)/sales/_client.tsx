@@ -50,7 +50,7 @@ interface Props {
   initialData: EggSale[];
 }
 
-function InvoiceView({ sale, companyName, companyNotes }: { sale: EggSale; companyName?: string | null; companyNotes?: string | null }) {
+function InvoiceView({ sale, companyName, companyNotes, companyLogo }: { sale: EggSale; companyName?: string | null; companyNotes?: string | null; companyLogo?: string | null }) {
   const invoiceRef = useRef<HTMLDivElement>(null);
 
   function handlePrint() {
@@ -78,9 +78,17 @@ function InvoiceView({ sale, companyName, companyNotes }: { sale: EggSale; compa
   return (
     <div className="space-y-4">
       <div ref={invoiceRef} className="p-4 bg-white border border-gray-200 rounded-xl">
-        <h2 className="text-lg font-bold text-gray-800">INVOICE</h2>
-        {companyName && <p className="text-lg font-bold text-gray-800 subtitle">{companyName}</p>}
-        {companyNotes && <p className="text-xs text-gray-400 mt-0.5">{companyNotes}</p>}
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">INVOICE</h2>
+            {companyName && <p className="text-lg font-bold text-gray-800 subtitle">{companyName}</p>}
+            {companyNotes && <p className="text-xs text-gray-400 mt-0.5">{companyNotes}</p>}
+          </div>
+          {companyLogo && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={companyLogo} alt="Logo" className="w-12 h-12 object-contain shrink-0" />
+          )}
+        </div>
         <div className="divider border-t border-dashed border-gray-200 my-3" />
         <div className="space-y-2 text-sm">
           <div className="row flex justify-between">
@@ -667,6 +675,7 @@ export default function SalesClient({ initialData }: Props) {
               sale={invoiceSale}
               companyName={session?.user?.companyName}
               companyNotes={session?.user?.notes}
+              companyLogo={session?.user?.logoUrl}
             />
           )}
         </SheetContent>
