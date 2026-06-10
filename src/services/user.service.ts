@@ -55,7 +55,7 @@ export async function createUser(input: {
   name: string;
   email: string;
   password: string;
-  role: "DEVELOPER" | "OWNER" | "STAFF";
+  role: "DEVELOPER" | "OWNER" | "STAFF" | "FARM_HEAD" | "QA_HEAD";
   companyName?: string;
   notes?: string;
   logoUrl?: string | null;
@@ -84,7 +84,7 @@ export async function updateUser(
   input: {
     name?: string;
     email?: string;
-    role?: "DEVELOPER" | "OWNER" | "STAFF";
+    role?: "DEVELOPER" | "OWNER" | "STAFF" | "FARM_HEAD" | "QA_HEAD";
     isActive?: boolean;
     companyName?: string | null;
     notes?: string | null;

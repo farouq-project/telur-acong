@@ -2,61 +2,13 @@ import { getTotalEggsSold } from "./sales.service";
 import { decimalToNumber } from "@/lib/utils";
 import prisma from "@/lib/prisma";
 
-export async function getEggStockKg(): Promise<number> {
+export async function getEggStock(): Promise<number> {
   const [producedResult, sold] = await Promise.all([
     prisma.eggProduction.aggregate({ _sum: { goodEggsKg: true } }),
     getTotalEggsSold(),
   ]);
   const producedKg = decimalToNumber(producedResult._sum.goodEggsKg);
   return Math.max(0, producedKg - sold);
-}
-
-export async function getEggStock(): Promise<number> {
-  return getEggStockKg();
-}
-
-export interface EggStockBreakdown {
-  previousStock: number;
-  todayProduced: number;
-  todaySold: number;
-  currentStock: number;
-}
-
-export async function getEggStockBreakdown(): Promise<EggStockBreakdown> {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-
-  const [totalProducedResult, totalSoldResult, todayProducedResult, todaySoldResult] =
-    await Promise.all([
-      prisma.eggProduction.aggregate({
-        where: { date: { lt: tomorrow } },
-        _sum: { goodEggsKg: true },
-      }),
-      prisma.eggSale.aggregate({
-        where: { date: { lt: tomorrow } },
-        _sum: { qtySold: true },
-      }),
-      prisma.eggProduction.aggregate({
-        where: { date: { gte: today, lt: tomorrow } },
-        _sum: { goodEggsKg: true },
-      }),
-      prisma.eggSale.aggregate({
-        where: { date: { gte: today, lt: tomorrow } },
-        _sum: { qtySold: true },
-      }),
-    ]);
-
-  const totalProduced = decimalToNumber(totalProducedResult._sum.goodEggsKg);
-  const totalSold = decimalToNumber(totalSoldResult._sum.qtySold);
-  const todayProduced = decimalToNumber(todayProducedResult._sum.goodEggsKg);
-  const todaySold = decimalToNumber(todaySoldResult._sum.qtySold);
-
-  const currentStock = Math.max(0, totalProduced - totalSold);
-  const previousStock = Math.max(0, currentStock - todayProduced + todaySold);
-
-  return { previousStock, todayProduced, todaySold, currentStock };
 }
 
 export interface FeedStockItem {

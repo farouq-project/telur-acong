@@ -11,12 +11,13 @@ import {
   Lock,
   ChevronRight,
   FileText,
-  Package,
   Wallet,
   Home,
+  ClipboardList,
 } from "lucide-react";
 import { MobileHeader } from "@/components/layout/MobileHeader";
 import { Separator } from "@/components/ui/separator";
+import { isPathAllowed } from "@/lib/access";
 
 const menuItems = [
   {
@@ -26,7 +27,7 @@ const menuItems = [
       { href: "/medicine", label: "Obat & Vaksin", icon: Syringe, color: "bg-blue-100 text-blue-600" },
       { href: "/vaccination", label: "Jadwal Vaksin", icon: CalendarCheck, color: "bg-emerald-100 text-emerald-600" },
       { href: "/mortality", label: "Kematian Ternak", icon: Skull, color: "bg-red-100 text-red-600" },
-      { href: "/stock", label: "Stok", icon: Package, color: "bg-orange-100 text-orange-600" },
+      { href: "/so-telur", label: "SO Telur", icon: ClipboardList, color: "bg-amber-100 text-amber-600" },
     ],
   },
 ];
@@ -51,17 +52,25 @@ const settingsItems = {
 
 export default function MorePage() {
   const { data: session } = useSession();
-  const isOwner = (session?.user?.role === "OWNER" || session?.user?.role === "DEVELOPER");
+  const role = session?.user?.role;
+  const isOwner = (role === "OWNER" || role === "DEVELOPER");
 
   const sections = [...menuItems];
   if (isOwner) sections.push(ownerItems);
   sections.push(settingsItems);
 
+  const visibleSections = sections
+    .map((section) => ({
+      ...section,
+      items: role ? section.items.filter((item) => isPathAllowed(role, item.href)) : section.items,
+    }))
+    .filter((section) => section.items.length > 0);
+
   return (
     <>
       <MobileHeader title="Lainnya" />
       <div className="px-4 py-4 space-y-4">
-        {sections.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.section}>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">
               {section.section}

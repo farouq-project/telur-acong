@@ -22,13 +22,15 @@ const ROLE_LABELS: Record<string, string> = {
   DEVELOPER: "Developer",
   OWNER: "Pemilik",
   STAFF: "Staf",
+  FARM_HEAD: "Farm Head",
+  QA_HEAD: "QA Head",
 };
 
 const createSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(6),
-  role: z.enum(["DEVELOPER", "OWNER", "STAFF"]),
+  role: z.enum(["DEVELOPER", "OWNER", "STAFF", "FARM_HEAD", "QA_HEAD"]),
   companyName: z.string().optional(),
   notes: z.string().optional(),
   logoUrl: z.string().optional(),
@@ -37,7 +39,7 @@ const createSchema = z.object({
 const editSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
-  role: z.enum(["DEVELOPER", "OWNER", "STAFF"]),
+  role: z.enum(["DEVELOPER", "OWNER", "STAFF", "FARM_HEAD", "QA_HEAD"]),
   isActive: z.boolean(),
   companyName: z.string().optional(),
   notes: z.string().optional(),
@@ -294,6 +296,8 @@ export default function UsersPage() {
                 <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="STAFF">Staf</SelectItem>
+                  <SelectItem value="FARM_HEAD">Farm Head</SelectItem>
+                  <SelectItem value="QA_HEAD">QA Head</SelectItem>
                   <SelectItem value="OWNER">Pemilik</SelectItem>
                   <SelectItem value="DEVELOPER">Developer</SelectItem>
                 </SelectContent>

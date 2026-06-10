@@ -5,6 +5,7 @@ import { MobileHeader } from "@/components/layout/MobileHeader";
 import { RefreshButton } from "@/components/layout/RefreshButton";
 import { DashboardCharts } from "./DashboardCharts";
 import { HouseReportCard } from "./HouseReportCard";
+import { EggFlowCard } from "./EggFlowCard";
 import { CalendarCheck } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
@@ -55,13 +56,12 @@ export default async function DashboardPage({
         {/* Per-kandang report */}
         <HouseReportCard
           houseReport={stats.houseReport}
-          jualBagusKg={stats.jualBagusKg}
-          jualRetakKg={stats.jualRetakKg}
-          stokTelurBagus={stats.stokTelurBagus}
-          stokTelurRetak={stats.stokTelurRetak}
           from={from}
           to={to}
         />
+
+        {/* Telur stock flow */}
+        <EggFlowCard eggFlow={stats.eggFlow} />
 
         {/* Charts — client component, owner only */}
         {isOwner && (

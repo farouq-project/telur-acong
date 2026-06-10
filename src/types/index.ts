@@ -1,4 +1,4 @@
-export type UserRole = "DEVELOPER" | "OWNER" | "STAFF";
+export type UserRole = "DEVELOPER" | "OWNER" | "STAFF" | "FARM_HEAD" | "QA_HEAD";
 export type MedCategory = "MEDICINE" | "VACCINE";
 export type NotificationType =
   | "LOW_EGG_STOCK"
@@ -100,6 +100,37 @@ export interface FeedSale {
   totalValue: number;
   createdAt: string;
   updatedAt?: string;
+}
+
+export interface FeedStockOpname {
+  id: string;
+  date: string;
+  feedProductId: string;
+  feedProduct?: FeedProduct;
+  qtyKg: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface FeedStockDay {
+  date: string;
+  beliKg: number;
+  pakaiKg: number;
+  jualKg: number;
+  sisaStokKg: number;
+  sisaStokRealKg: number | null;
+}
+
+export interface SoTelurDay {
+  date: string;
+  telurBagusKg: number;
+  telurRetakKg: number;
+  telurBuleKg: number;
+  totalProduksiKg: number;
+  telurBagusRealKg: number | null;
+  telurRetakRealKg: number | null;
+  telurBuleRealKg: number | null;
+  totalRealKg: number | null;
 }
 
 export interface MedicineVaccine {

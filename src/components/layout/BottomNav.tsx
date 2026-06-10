@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   LayoutDashboard,
   Egg,
@@ -10,6 +11,7 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isPathAllowed } from "@/lib/access";
 
 const navItems = [
   {
@@ -41,11 +43,14 @@ const navItems = [
 
 export function BottomNav() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const role = session?.user?.role;
+  const items = role ? navItems.filter((item) => isPathAllowed(role, item.href)) : navItems;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 safe-pb">
       <div className="flex items-stretch h-16">
-        {navItems.map((item) => {
+        {items.map((item) => {
           const Icon = item.icon;
           const isActive =
             pathname === item.href ||

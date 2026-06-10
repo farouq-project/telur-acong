@@ -35,13 +35,9 @@ function monthRange(): { from: string; to: string } {
 }
 
 export function HouseReportCard({
-  houseReport, jualBagusKg, jualRetakKg, stokTelurBagus, stokTelurRetak, from, to,
+  houseReport, from, to,
 }: {
   houseReport: HouseReport[];
-  jualBagusKg: number;
-  jualRetakKg: number;
-  stokTelurBagus: number;
-  stokTelurRetak: number;
   from?: string;
   to?: string;
 }) {
@@ -160,10 +156,6 @@ export function HouseReportCard({
                     <SortIcon col={col.key} sortCol={sortCol} sortDir={sortDir} />
                   </th>
                 ))}
-                <th className="text-right font-medium px-2 py-1.5">Jual Bagus (kg)</th>
-                <th className="text-right font-medium px-2 py-1.5">Jual Retak (kg)</th>
-                <th className="text-right font-medium px-2 py-1.5">Stok Bagus (kg)</th>
-                <th className="text-right font-medium px-2 py-1.5">Stok Retak (kg)</th>
               </tr>
             </thead>
             <tbody>
@@ -175,10 +167,6 @@ export function HouseReportCard({
                   <td className="px-2 py-1.5 text-right">{formatNumber(h.pakanKg)}</td>
                   <td className="px-2 py-1.5 text-right">{formatNumber(h.telurBagusKg)}</td>
                   <td className="px-2 py-1.5 text-right">{formatNumber(h.telurRetakKg)}</td>
-                  <td className="px-2 py-1.5 text-right text-gray-400">-</td>
-                  <td className="px-2 py-1.5 text-right text-gray-400">-</td>
-                  <td className="px-2 py-1.5 text-right text-gray-400">-</td>
-                  <td className="px-2 py-1.5 text-right text-gray-400">-</td>
                 </tr>
               ))}
             </tbody>
@@ -200,10 +188,6 @@ export function HouseReportCard({
                 <td className="px-2 py-1.5 text-right">
                   {formatNumber(houseReport.reduce((sum, h) => sum + h.telurRetakKg, 0))}
                 </td>
-                <td className="px-2 py-1.5 text-right">{formatNumber(jualBagusKg)}</td>
-                <td className="px-2 py-1.5 text-right">{formatNumber(jualRetakKg)}</td>
-                <td className="px-2 py-1.5 text-right">{formatNumber(stokTelurBagus)}</td>
-                <td className="px-2 py-1.5 text-right">{formatNumber(stokTelurRetak)}</td>
               </tr>
             </tfoot>
           </table>

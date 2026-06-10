@@ -11,6 +11,8 @@ enum Role {
   DEVELOPER
   OWNER
   STAFF
+  FARM_HEAD
+  QA_HEAD
 }
 
 enum MedCategory {
@@ -123,6 +125,7 @@ model FeedProduct {
   usages     FeedUsage[]
   sales      FeedSale[]
   productions EggProduction[]
+  stockOpnames FeedStockOpname[]
 
   @@map("feed_products")
 }
@@ -234,6 +237,34 @@ model House {
   updatedAt         DateTime @updatedAt
 
   @@map("houses")
+}
+
+model FeedStockOpname {
+  id            String   @id @default(cuid())
+  date          DateTime @db.Date
+  feedProductId String
+  qtyKg         Decimal  @db.Decimal(10, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  feedProduct FeedProduct @relation(fields: [feedProductId], references: [id], onDelete: Cascade)
+
+  @@unique([date, feedProductId])
+  @@index([date])
+  @@index([feedProductId])
+  @@map("feed_stock_opname")
+}
+
+model EggStockOpname {
+  id            String   @id @default(cuid())
+  date          DateTime @db.Date @unique
+  telurBagusKg  Decimal  @db.Decimal(10, 2) @default(0)
+  telurRetakKg  Decimal  @db.Decimal(10, 2) @default(0)
+  telurBuleKg   Decimal  @db.Decimal(10, 2) @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("egg_stock_opname")
 }
 
 model Notification {

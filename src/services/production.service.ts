@@ -420,6 +420,82 @@ export async function getProductionReportByHouse(params?: { from?: string; to?: 
   return Array.from(map.values()).sort((a, b) => a.house.localeCompare(b.house));
 }
 
+export interface EggFlowDay {
+  date: string;
+  stokKemarin: number;
+  produksiHariIni: number;
+  terjualHariIni: number;
+  stokHariIni: number;
+}
+
+// Alur stok telur per hari: stok kemarin + produksi hari ini − terjual hari ini = stok hari ini.
+// Jika tidak ada rentang tanggal, default ke 7 hari terakhir.
+export async function getEggFlowByDay(params?: { from?: string; to?: string }): Promise<EggFlowDay[]> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const from = params?.from ? new Date(params.from) : new Date(today);
+  const to = params?.to ? new Date(params.to) : new Date(today);
+  if (!params?.from && !params?.to) {
+    from.setDate(from.getDate() - 6);
+  }
+  from.setHours(0, 0, 0, 0);
+  to.setHours(0, 0, 0, 0);
+
+  const [priorProduced, priorSold, rangeProduction, rangeSales] = await Promise.all([
+    prisma.eggProduction.aggregate({
+      where: { date: { lt: from } },
+      _sum: { goodEggsKg: true, crackedEggsKg: true, rejectedEggsKg: true },
+    }),
+    prisma.eggSale.aggregate({
+      where: { date: { lt: from } },
+      _sum: { qtySold: true },
+    }),
+    prisma.eggProduction.findMany({
+      where: { date: { gte: from, lte: to } },
+      select: { date: true, goodEggsKg: true, crackedEggsKg: true, rejectedEggsKg: true },
+    }),
+    prisma.eggSale.findMany({
+      where: { date: { gte: from, lte: to } },
+      select: { date: true, qtySold: true },
+    }),
+  ]);
+
+  const producedByDay = new Map<string, number>();
+  for (const r of rangeProduction) {
+    const key = r.date.toISOString().slice(0, 10);
+    const kg = decimalToNumber(r.goodEggsKg) + decimalToNumber(r.crackedEggsKg) + decimalToNumber(r.rejectedEggsKg);
+    producedByDay.set(key, (producedByDay.get(key) ?? 0) + kg);
+  }
+
+  const soldByDay = new Map<string, number>();
+  for (const r of rangeSales) {
+    const key = r.date.toISOString().slice(0, 10);
+    soldByDay.set(key, (soldByDay.get(key) ?? 0) + decimalToNumber(r.qtySold));
+  }
+
+  let runningStock = Math.max(
+    0,
+    decimalToNumber(priorProduced._sum.goodEggsKg) +
+      decimalToNumber(priorProduced._sum.crackedEggsKg) +
+      decimalToNumber(priorProduced._sum.rejectedEggsKg) -
+      decimalToNumber(priorSold._sum.qtySold)
+  );
+
+  const result: EggFlowDay[] = [];
+  for (const d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+    const key = d.toISOString().slice(0, 10);
+    const produksi = producedByDay.get(key) ?? 0;
+    const terjual = soldByDay.get(key) ?? 0;
+    const stokKemarin = runningStock;
+    const stokHariIni = Math.max(0, stokKemarin + produksi - terjual);
+    result.push({ date: key, stokKemarin, produksiHariIni: produksi, terjualHariIni: terjual, stokHariIni });
+    runningStock = stokHariIni;
+  }
+
+  return result;
+}
+
 export interface DailyMetric {
   id: string;
   date: string;
@@ -469,4 +545,108 @@ export async function getDailyMetrics() {
       feedIntake: feedIntake !== null ? Math.round(feedIntake * 1000) / 1000 : null,
     };
   });
+}
+
+export interface SoTelurDay {
+  date: string;
+  telurBagusKg: number;
+  telurRetakKg: number;
+  telurBuleKg: number;
+  totalProduksiKg: number;
+  telurBagusRealKg: number | null;
+  telurRetakRealKg: number | null;
+  telurBuleRealKg: number | null;
+  totalRealKg: number | null;
+}
+
+// Tabel SO Telur harian: produksi (bagus/retak/bule) vs hasil stok opname real per hari.
+// Jika tidak ada rentang tanggal, default ke 30 hari terakhir.
+export async function getSoTelurDaily(params?: { from?: string; to?: string }): Promise<SoTelurDay[]> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const from = params?.from ? new Date(params.from) : new Date(today);
+  const to = params?.to ? new Date(params.to) : new Date(today);
+  if (!params?.from && !params?.to) {
+    from.setDate(from.getDate() - 29);
+  }
+  from.setHours(0, 0, 0, 0);
+  to.setHours(0, 0, 0, 0);
+
+  const [rangeProduction, rangeOpnames] = await Promise.all([
+    prisma.eggProduction.findMany({
+      where: { date: { gte: from, lte: to } },
+      select: { date: true, goodEggsKg: true, crackedEggsKg: true, rejectedEggsKg: true },
+    }),
+    prisma.eggStockOpname.findMany({
+      where: { date: { gte: from, lte: to } },
+    }),
+  ]);
+
+  const productionByDay = new Map<string, { bagus: number; retak: number; bule: number }>();
+  for (const r of rangeProduction) {
+    const key = r.date.toISOString().slice(0, 10);
+    const cur = productionByDay.get(key) ?? { bagus: 0, retak: 0, bule: 0 };
+    cur.bagus += decimalToNumber(r.goodEggsKg);
+    cur.retak += decimalToNumber(r.crackedEggsKg);
+    cur.bule += decimalToNumber(r.rejectedEggsKg);
+    productionByDay.set(key, cur);
+  }
+
+  const opnameByDay = new Map<string, { bagus: number; retak: number; bule: number }>();
+  for (const r of rangeOpnames) {
+    const key = r.date.toISOString().slice(0, 10);
+    opnameByDay.set(key, {
+      bagus: decimalToNumber(r.telurBagusKg),
+      retak: decimalToNumber(r.telurRetakKg),
+      bule: decimalToNumber(r.telurBuleKg),
+    });
+  }
+
+  const result: SoTelurDay[] = [];
+  for (const d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+    const key = d.toISOString().slice(0, 10);
+    const prod = productionByDay.get(key) ?? { bagus: 0, retak: 0, bule: 0 };
+    const opname = opnameByDay.get(key);
+    result.push({
+      date: key,
+      telurBagusKg: prod.bagus,
+      telurRetakKg: prod.retak,
+      telurBuleKg: prod.bule,
+      totalProduksiKg: prod.bagus + prod.retak + prod.bule,
+      telurBagusRealKg: opname ? opname.bagus : null,
+      telurRetakRealKg: opname ? opname.retak : null,
+      telurBuleRealKg: opname ? opname.bule : null,
+      totalRealKg: opname ? opname.bagus + opname.retak + opname.bule : null,
+    });
+  }
+
+  return result;
+}
+
+export async function upsertEggStockOpname(input: { date: string; telurBagusKg: number; telurRetakKg: number; telurBuleKg: number }) {
+  const date = new Date(input.date);
+  const record = await prisma.eggStockOpname.upsert({
+    where: { date },
+    create: {
+      date,
+      telurBagusKg: input.telurBagusKg,
+      telurRetakKg: input.telurRetakKg,
+      telurBuleKg: input.telurBuleKg,
+    },
+    update: {
+      telurBagusKg: input.telurBagusKg,
+      telurRetakKg: input.telurRetakKg,
+      telurBuleKg: input.telurBuleKg,
+    },
+  });
+  return {
+    ...record,
+    date: record.date.toISOString(),
+    telurBagusKg: decimalToNumber(record.telurBagusKg),
+    telurRetakKg: decimalToNumber(record.telurRetakKg),
+    telurBuleKg: decimalToNumber(record.telurBuleKg),
+    createdAt: record.createdAt.toISOString(),
+    updatedAt: record.updatedAt.toISOString(),
+  };
 }

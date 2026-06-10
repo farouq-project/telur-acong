@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  Plus, Edit2, Trash2, Loader2, ShoppingBag, ShoppingCart,
+  Plus, Edit2, Trash2, Loader2, ShoppingBag, ShoppingCart, Archive, ClipboardList,
   ArrowUpDown, ArrowUp, ArrowDown, ListChecks, CheckSquare, Square, ListFilter,
 } from "lucide-react";
 import { MobileHeader } from "@/components/layout/MobileHeader";
@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate, formatNumber, formatRupiah, todayISO } from "@/lib/utils";
-import type { FeedProduct, FeedPurchase, FeedUsage, FeedSale } from "@/types";
+import type { FeedProduct, FeedPurchase, FeedUsage, FeedSale, FeedStockDay } from "@/types";
 
 const purchaseSchema = z.object({
   date: z.string().min(1),
@@ -47,9 +47,16 @@ const productSchema = z.object({
   unit: z.string().min(1),
 });
 
+const stockOpnameSchema = z.object({
+  date: z.string().min(1),
+  feedProductId: z.string().min(1, "Pilih produk pakan"),
+  qtyKg: z.coerce.number().min(0),
+});
+
 type PurchaseForm = z.infer<typeof purchaseSchema>;
 type SaleForm = z.infer<typeof saleSchema>;
 type ProductForm = z.infer<typeof productSchema>;
+type StockOpnameForm = z.infer<typeof stockOpnameSchema>;
 
 interface Props {
   initialProducts: FeedProduct[];
@@ -253,6 +260,40 @@ function SaleTable({
   );
 }
 
+function StockTable({ records, sortCol, sortDir, onSort, unit }: {
+  records: FeedStockDay[]; sortCol: string; sortDir: "asc" | "desc"; onSort: (col: string) => void; unit: string;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+      <table className="w-full border-collapse text-[11px]" style={{ minWidth: 760 }}>
+        <thead className="bg-gray-50 sticky top-0 z-10">
+          <tr>
+            <Th col="date" label="Tanggal" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <Th col="beliKg" label={`Total Beli (${unit})`} align="right" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <Th col="pakaiKg" label={`Total Pemakaian (${unit})`} align="right" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <Th col="jualKg" label={`Total Jual (${unit})`} align="right" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <Th col="sisaStokKg" label={`Sisa Stok (${unit})`} align="right" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <Th col="sisaStokRealKg" label={`Sisa Stok Real (${unit})`} align="right" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+          </tr>
+        </thead>
+        <tbody>
+          {records.map((r, idx) => (
+            <tr key={r.date} className={`${idx % 2 === 1 ? "bg-gray-50/60" : "bg-white"} border-b border-gray-100`}>
+              <td className="px-2 py-1.5 whitespace-nowrap text-gray-500">{formatDate(r.date)}</td>
+              <td className="px-2 py-1.5 text-right font-mono text-green-700">{formatNumber(r.beliKg)}</td>
+              <td className="px-2 py-1.5 text-right font-mono text-amber-600">{formatNumber(r.pakaiKg)}</td>
+              <td className="px-2 py-1.5 text-right font-mono text-purple-600">{formatNumber(r.jualKg)}</td>
+              <td className="px-2 py-1.5 text-right font-mono font-semibold text-gray-800">{formatNumber(r.sisaStokKg)}</td>
+              <td className="px-2 py-1.5 text-right font-mono">{r.sisaStokRealKg != null ? formatNumber(r.sisaStokRealKg) : <span className="text-gray-300">—</span>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="px-3 py-1.5 text-[10px] text-gray-400 border-t border-gray-100">{records.length} baris</div>
+    </div>
+  );
+}
+
 export default function FeedClient({ initialProducts, initialPurchases, initialUsages, initialFeedSales }: Props) {
   const { data: session } = useSession();
   const { toast } = useToast();
@@ -261,13 +302,13 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
   const [usages, setUsages] = useState<FeedUsage[]>(initialUsages);
   const [feedSales, setFeedSales] = useState<FeedSale[]>(initialFeedSales);
   const [fetching, setFetching] = useState(false);
-  const [activeSheet, setActiveSheet] = useState<"purchase" | "sale" | "product" | null>(null);
+  const [activeSheet, setActiveSheet] = useState<"purchase" | "sale" | "product" | "stockOpname" | null>(null);
   const [chooserOpen, setChooserOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<"purchases" | "usage" | "sales" | "products">("purchases");
+  const [activeTab, setActiveTab] = useState<"purchases" | "usage" | "sales" | "products" | "stock">("purchases");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [pageSize, setPageSize] = useState<"50" | "100" | "200" | "all">("50");
@@ -279,9 +320,14 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
   const [bulkDeleteOpen, setBulkDeleting2Open] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
+  const [stockProductId, setStockProductId] = useState("");
+  const [stockData, setStockData] = useState<FeedStockDay[]>([]);
+  const [stockFetching, setStockFetching] = useState(false);
+
   const purchaseForm = useForm<PurchaseForm>({ resolver: zodResolver(purchaseSchema), defaultValues: { date: todayISO(), feedProductId: "", qty: 0, pricePerKg: "", notes: "" } });
   const saleForm = useForm<SaleForm>({ resolver: zodResolver(saleSchema), defaultValues: { date: todayISO(), customerName: "", feedProductId: "", qty: 0, unitPrice: 0 } });
   const productForm = useForm<ProductForm>({ resolver: zodResolver(productSchema), defaultValues: { name: "", unit: "kg" } });
+  const stockOpnameForm = useForm<StockOpnameForm>({ resolver: zodResolver(stockOpnameSchema), defaultValues: { date: todayISO(), feedProductId: "", qtyKg: 0 } });
 
   const fetchAll = useCallback(async () => {
     setFetching(true);
@@ -311,11 +357,33 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFrom, dateTo, pageSize]);
 
+  useEffect(() => {
+    if (!stockProductId && products.length > 0) setStockProductId(products[0].id);
+  }, [products, stockProductId]);
+
+  const fetchStockData = useCallback(async () => {
+    if (!stockProductId) return;
+    setStockFetching(true);
+    try {
+      const params = new URLSearchParams({ feedProductId: stockProductId });
+      if (dateFrom) params.set("from", dateFrom);
+      if (dateTo) params.set("to", dateTo);
+      const json = await fetch(`/api/v1/feed-stock?${params}`).then((r) => r.json());
+      setStockData(json.data ?? []);
+    } finally {
+      setStockFetching(false);
+    }
+  }, [stockProductId, dateFrom, dateTo]);
+
+  useEffect(() => {
+    if (activeTab === "stock") fetchStockData();
+  }, [activeTab, fetchStockData]);
+
   function toggleFilterHouse(name: string) {
     setFilterHouses((prev) => (prev.includes(name) ? prev.filter((h) => h !== name) : [...prev, name]));
   }
 
-  function changeTab(tab: "purchases" | "usage" | "sales" | "products") {
+  function changeTab(tab: "purchases" | "usage" | "sales" | "products" | "stock") {
     setActiveTab(tab);
     setSortCol("date");
     setSortDir("desc");
@@ -383,6 +451,19 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [feedSales, sortCol, sortDir]);
+
+  const displayStock = useMemo(() => sortByCol(stockData, (r, col) => {
+    switch (col) {
+      case "date": return r.date;
+      case "beliKg": return r.beliKg;
+      case "pakaiKg": return r.pakaiKg;
+      case "jualKg": return r.jualKg;
+      case "sisaStokKg": return r.sisaStokKg;
+      case "sisaStokRealKg": return r.sisaStokRealKg;
+      default: return r.date;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [stockData, sortCol, sortDir]);
 
   const visibleIds = activeTab === "purchases" ? displayPurchases.map((r) => r.id)
     : activeTab === "sales" ? displaySales.map((r) => r.id)
@@ -468,6 +549,22 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
     finally { setSubmitting(false); }
   }
 
+  async function submitStockOpname(data: StockOpnameForm) {
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/v1/feed-stock-opname", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      toast({ variant: "success", title: "Stok real disimpan" });
+      setActiveSheet(null);
+      if (activeTab === "stock" && data.feedProductId === stockProductId) fetchStockData();
+    } catch (e) { toast({ variant: "destructive", title: "Gagal", description: String(e) }); }
+    finally { setSubmitting(false); }
+  }
+
   async function confirmDelete() {
     if (!deleteTarget) return;
     const endpoints: Record<string, string> = {
@@ -501,20 +598,33 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
     setActiveSheet("product");
   }
 
+  function openStockOpname() {
+    stockOpnameForm.reset({ date: todayISO(), feedProductId: stockProductId || "", qtyKg: 0 });
+    setEditingId(null);
+    setActiveSheet("stockOpname");
+  }
+
   return (
     <>
       <MobileHeader title="Manajemen Pakan" />
       <div className="px-4 py-4">
         <Tabs value={activeTab} onValueChange={(v) => changeTab(v as typeof activeTab)}>
-          <TabsList className="grid grid-cols-4 w-full mb-3">
+          <TabsList className="grid grid-cols-5 w-full mb-3">
             <TabsTrigger value="purchases" className="text-xs">Beli</TabsTrigger>
             <TabsTrigger value="usage" className="text-xs">Pakai</TabsTrigger>
             <TabsTrigger value="sales" className="text-xs">Jual</TabsTrigger>
             <TabsTrigger value="products" className="text-xs">Produk</TabsTrigger>
+            <TabsTrigger value="stock" className="text-xs">Stok Pakan</TabsTrigger>
           </TabsList>
 
-          {(activeTab === "purchases" || activeTab === "usage" || activeTab === "sales") && (
+          {(activeTab === "purchases" || activeTab === "usage" || activeTab === "sales" || activeTab === "stock") && (
             <div className="flex flex-wrap items-center gap-2 mb-3">
+              {activeTab === "stock" && (
+                <Select value={stockProductId} onValueChange={setStockProductId}>
+                  <SelectTrigger className="h-9 w-[160px] text-xs"><SelectValue placeholder="Pilih produk" /></SelectTrigger>
+                  <SelectContent>{products.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                </Select>
+              )}
               {activeTab === "usage" && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -569,19 +679,21 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
                 </button>
               )}
 
-              <div className="flex items-center gap-0.5 border border-gray-200 rounded-lg overflow-hidden shrink-0 ml-auto">
-                {(["50", "100", "200", "all"] as const).map((v) => (
-                  <button
-                    key={v}
-                    onClick={() => setPageSize(v)}
-                    className={`px-2 h-9 text-xs font-medium transition-colors ${
-                      pageSize === v ? "bg-green-600 text-white" : "bg-white text-gray-500 hover:bg-gray-50"
-                    }`}
-                  >
-                    {v === "all" ? "Semua" : v}
-                  </button>
-                ))}
-              </div>
+              {activeTab !== "stock" && (
+                <div className="flex items-center gap-0.5 border border-gray-200 rounded-lg overflow-hidden shrink-0 ml-auto">
+                  {(["50", "100", "200", "all"] as const).map((v) => (
+                    <button
+                      key={v}
+                      onClick={() => setPageSize(v)}
+                      className={`px-2 h-9 text-xs font-medium transition-colors ${
+                        pageSize === v ? "bg-green-600 text-white" : "bg-white text-gray-500 hover:bg-gray-50"
+                      }`}
+                    >
+                      {v === "all" ? "Semua" : v}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {isOwner && (activeTab === "purchases" || activeTab === "sales") && (
                 <Button
@@ -670,6 +782,20 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
             ))}
             <AddButton onClick={() => openProduct()} label="Tambah Produk" />
           </TabsContent>
+
+          <TabsContent value="stock" className="space-y-2">
+            {!stockProductId ? <Empty label="Belum ada produk pakan" /> :
+              stockFetching ? <div className="h-20 rounded-xl bg-gray-100 animate-pulse" /> :
+              displayStock.length === 0 ? <Empty label="Belum ada data stok pakan" /> :
+              <StockTable
+                records={displayStock}
+                sortCol={sortCol}
+                sortDir={sortDir}
+                onSort={handleSort}
+                unit={products.find((p) => p.id === stockProductId)?.unit ?? "kg"}
+              />
+            }
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -714,6 +840,13 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
               title="Penjualan"
               description="Catat pakan yang terjual ke pelanggan"
               onClick={() => { setChooserOpen(false); openSale(); }}
+            />
+            <ChooserOption
+              icon={<ClipboardList className="w-5 h-5" />}
+              accent="amber"
+              title="Stok Real"
+              description="Catat hasil stok opname pakan per hari"
+              onClick={() => { setChooserOpen(false); openStockOpname(); }}
             />
           </div>
         </SheetContent>
@@ -802,6 +935,30 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
               <Input className="h-11" placeholder="kg" {...productForm.register("unit")} />
             </div>
             <FormActions submitting={submitting} onCancel={() => setActiveSheet(null)} editingId={editingId} />
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={activeSheet === "stockOpname"} onOpenChange={(o) => !o && setActiveSheet(null)}>
+        <SheetContent side="bottom" className="rounded-t-2xl">
+          <SheetHeader className="mb-4"><SheetTitle>Stok Real Pakan</SheetTitle></SheetHeader>
+          <form onSubmit={stockOpnameForm.handleSubmit(submitStockOpname)} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Tanggal</Label>
+              <Input type="date" className="h-11" {...stockOpnameForm.register("date")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Produk Pakan</Label>
+              <Select onValueChange={(v) => stockOpnameForm.setValue("feedProductId", v)} value={stockOpnameForm.watch("feedProductId")}>
+                <SelectTrigger className="h-11"><SelectValue placeholder="Pilih produk" /></SelectTrigger>
+                <SelectContent>{products.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Sisa Stok Real (kg)</Label>
+              <Input type="number" step="0.01" min="0" className="h-11" {...stockOpnameForm.register("qtyKg")} />
+            </div>
+            <FormActions submitting={submitting} onCancel={() => setActiveSheet(null)} editingId={null} />
           </form>
         </SheetContent>
       </Sheet>

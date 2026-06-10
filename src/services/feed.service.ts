@@ -436,3 +436,131 @@ export async function deleteFeedSales(ids: string[]) {
   const result = await prisma.feedSale.deleteMany({ where: { id: { in: ids } } });
   return result.count;
 }
+
+// ─── Feed Stock Opname (Sisa Stok Pakan Real) ──────────────────────────────────
+
+export async function getFeedStockOpnames(params?: { feedProductId?: string; from?: string; to?: string }) {
+  const { feedProductId, from, to } = params ?? {};
+  const records = await prisma.feedStockOpname.findMany({
+    where: {
+      ...(feedProductId && { feedProductId }),
+      ...(from || to
+        ? {
+            date: {
+              ...(from && { gte: new Date(from) }),
+              ...(to && { lte: new Date(to) }),
+            },
+          }
+        : {}),
+    },
+    include: { feedProduct: true },
+    orderBy: [{ date: "desc" }],
+  });
+
+  return records.map((r) => ({
+    ...r,
+    qtyKg: decimalToNumber(r.qtyKg),
+    date: r.date.toISOString(),
+    createdAt: r.createdAt.toISOString(),
+    updatedAt: r.updatedAt.toISOString(),
+  }));
+}
+
+export async function upsertFeedStockOpname(input: { date: string; feedProductId: string; qtyKg: number }) {
+  const date = new Date(input.date);
+  const record = await prisma.feedStockOpname.upsert({
+    where: { date_feedProductId: { date, feedProductId: input.feedProductId } },
+    create: { date, feedProductId: input.feedProductId, qtyKg: input.qtyKg },
+    update: { qtyKg: input.qtyKg },
+    include: { feedProduct: true },
+  });
+  return {
+    ...record,
+    qtyKg: decimalToNumber(record.qtyKg),
+    date: record.date.toISOString(),
+    createdAt: record.createdAt.toISOString(),
+    updatedAt: record.updatedAt.toISOString(),
+  };
+}
+
+export async function deleteFeedStockOpname(id: string) {
+  await prisma.feedStockOpname.delete({ where: { id } });
+}
+
+// ─── Feed Stock Daily (Stok Pakan tab) ─────────────────────────────────────────
+
+export interface FeedStockDay {
+  date: string;
+  beliKg: number;
+  pakaiKg: number;
+  jualKg: number;
+  sisaStokKg: number;
+  sisaStokRealKg: number | null;
+}
+
+// Tabel harian Stok Pakan untuk satu produk: saldo berjalan = saldo sebelumnya + beli − pakai − jual.
+// Jika tidak ada rentang tanggal, default ke 30 hari terakhir.
+export async function getFeedStockDaily(params: { feedProductId: string; from?: string; to?: string }): Promise<FeedStockDay[]> {
+  const { feedProductId } = params;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const from = params.from ? new Date(params.from) : new Date(today);
+  const to = params.to ? new Date(params.to) : new Date(today);
+  if (!params.from && !params.to) {
+    from.setDate(from.getDate() - 29);
+  }
+  from.setHours(0, 0, 0, 0);
+  to.setHours(0, 0, 0, 0);
+
+  const [priorPurchases, priorUsages, priorSales, rangePurchases, rangeUsages, rangeSales, rangeOpnames] = await Promise.all([
+    prisma.feedPurchase.aggregate({ where: { feedProductId, date: { lt: from } }, _sum: { qty: true } }),
+    prisma.feedUsage.aggregate({ where: { feedProductId, date: { lt: from } }, _sum: { qtyUsed: true } }),
+    prisma.feedSale.aggregate({ where: { feedProductId, date: { lt: from } }, _sum: { qty: true } }),
+    prisma.feedPurchase.findMany({ where: { feedProductId, date: { gte: from, lte: to } }, select: { date: true, qty: true } }),
+    prisma.feedUsage.findMany({ where: { feedProductId, date: { gte: from, lte: to } }, select: { date: true, qtyUsed: true } }),
+    prisma.feedSale.findMany({ where: { feedProductId, date: { gte: from, lte: to } }, select: { date: true, qty: true } }),
+    prisma.feedStockOpname.findMany({ where: { feedProductId, date: { gte: from, lte: to } }, select: { date: true, qtyKg: true } }),
+  ]);
+
+  const byDay = <T extends { date: Date }>(records: T[], pick: (r: T) => number) => {
+    const map = new Map<string, number>();
+    for (const r of records) {
+      const key = r.date.toISOString().slice(0, 10);
+      map.set(key, (map.get(key) ?? 0) + pick(r));
+    }
+    return map;
+  };
+
+  const purchasesByDay = byDay(rangePurchases, (r) => decimalToNumber(r.qty));
+  const usagesByDay = byDay(rangeUsages, (r) => decimalToNumber(r.qtyUsed));
+  const salesByDay = byDay(rangeSales, (r) => decimalToNumber(r.qty));
+  const opnameByDay = new Map<string, number>();
+  for (const r of rangeOpnames) {
+    opnameByDay.set(r.date.toISOString().slice(0, 10), decimalToNumber(r.qtyKg));
+  }
+
+  let runningStock =
+    decimalToNumber(priorPurchases._sum.qty) -
+    decimalToNumber(priorUsages._sum.qtyUsed) -
+    decimalToNumber(priorSales._sum.qty);
+
+  const result: FeedStockDay[] = [];
+  for (const d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+    const key = d.toISOString().slice(0, 10);
+    const beliKg = purchasesByDay.get(key) ?? 0;
+    const pakaiKg = usagesByDay.get(key) ?? 0;
+    const jualKg = salesByDay.get(key) ?? 0;
+    runningStock += beliKg - pakaiKg - jualKg;
+    result.push({
+      date: key,
+      beliKg,
+      pakaiKg,
+      jualKg,
+      sisaStokKg: runningStock,
+      sisaStokRealKg: opnameByDay.get(key) ?? null,
+    });
+  }
+
+  return result;
+}
