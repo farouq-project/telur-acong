@@ -287,6 +287,7 @@ export default function SalesClient({ initialData }: Props) {
   const [deleting, setDeleting] = useState(false);
   const [totalValue, setTotalValue] = useState(0);
   const [invoiceSale, setInvoiceSale] = useState<EggSale | null>(null);
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sortCol, setSortCol] = useState<string>("date");
@@ -331,6 +332,13 @@ export default function SalesClient({ initialData }: Props) {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, dateFrom, dateTo, pageSize]);
+
+  useEffect(() => {
+    fetch("/api/v1/profile")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => setCompanyLogo(json?.logoUrl ?? null))
+      .catch(() => setCompanyLogo(null));
+  }, []);
 
   const displayRecords = useMemo(() => {
     return [...records].sort((a, b) => {
@@ -675,7 +683,7 @@ export default function SalesClient({ initialData }: Props) {
               sale={invoiceSale}
               companyName={session?.user?.companyName}
               companyNotes={session?.user?.notes}
-              companyLogo={session?.user?.logoUrl}
+              companyLogo={companyLogo}
             />
           )}
         </SheetContent>
