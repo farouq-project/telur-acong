@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { decimalToNumber } from "@/lib/utils";
+import type { EggType } from "@/types";
 
 export interface CreateSaleInput {
   date: string;
@@ -9,6 +10,7 @@ export interface CreateSaleInput {
   invoiceNo?: string;
   jatuhTempoDays?: number | null;
   notes?: string;
+  eggType?: string | null;
 }
 
 function serializeSale(r: {
@@ -21,6 +23,7 @@ function serializeSale(r: {
   unitPrice: unknown;
   totalValue: unknown;
   notes: string | null;
+  eggType: string | null;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -29,6 +32,7 @@ function serializeSale(r: {
     qtySold: decimalToNumber(r.qtySold),
     unitPrice: decimalToNumber(r.unitPrice),
     totalValue: decimalToNumber(r.totalValue),
+    eggType: r.eggType as EggType | null,
     date: r.date.toISOString(),
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
@@ -91,6 +95,7 @@ export async function createSale(input: CreateSaleInput) {
       unitPrice: input.unitPrice,
       totalValue,
       notes: input.notes,
+      eggType: input.eggType ?? null,
     },
   });
   return serializeSale(record);
@@ -114,6 +119,7 @@ export async function updateSale(id: string, input: Partial<CreateSaleInput>) {
       ...(input.jatuhTempoDays !== undefined && { jatuhTempoDays: input.jatuhTempoDays }),
       totalValue,
       ...(input.notes !== undefined && { notes: input.notes }),
+      ...(input.eggType !== undefined && { eggType: input.eggType }),
     },
   });
   return serializeSale(record);
@@ -121,6 +127,11 @@ export async function updateSale(id: string, input: Partial<CreateSaleInput>) {
 
 export async function deleteSale(id: string) {
   await prisma.eggSale.delete({ where: { id } });
+}
+
+export async function deleteSales(ids: string[]) {
+  const result = await prisma.eggSale.deleteMany({ where: { id: { in: ids } } });
+  return result.count;
 }
 
 export async function getTodaySales(): Promise<number> {
@@ -141,6 +152,23 @@ export async function getTotalEggsSold(): Promise<number> {
     _sum: { qtySold: true },
   });
   return decimalToNumber(result._sum.qtySold);
+}
+
+export async function getEggSalesByType(): Promise<{ telurBagusKg: number; telurRetakKg: number }> {
+  const [bagus, retak] = await Promise.all([
+    prisma.eggSale.aggregate({
+      where: { eggType: "TELUR_BAGUS" },
+      _sum: { qtySold: true },
+    }),
+    prisma.eggSale.aggregate({
+      where: { eggType: "TELUR_RETAK" },
+      _sum: { qtySold: true },
+    }),
+  ]);
+  return {
+    telurBagusKg: decimalToNumber(bagus._sum.qtySold),
+    telurRetakKg: decimalToNumber(retak._sum.qtySold),
+  };
 }
 
 export async function getMonthlySales(): Promise<number> {

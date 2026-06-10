@@ -4,16 +4,8 @@ import { getCachedDashboardStats } from "@/lib/cache";
 import { MobileHeader } from "@/components/layout/MobileHeader";
 import { RefreshButton } from "@/components/layout/RefreshButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { DashboardCharts } from "./DashboardCharts";
-import {
-  Egg,
-  TrendingUp,
-  ShoppingCart,
-  Skull,
-  Wheat,
-  CalendarCheck,
-} from "lucide-react";
+import { CalendarCheck, ClipboardList } from "lucide-react";
 import { formatNumber, formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -55,90 +47,73 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        {/* Primary stat cards */}
-        <div className="grid grid-cols-2 gap-3">
-          <StatCard
-            icon={<Egg className="w-5 h-5 text-white" />}
-            color="bg-green-600"
-            label="Stok Telur"
-            value={formatNumber(stats.eggStock)}
-            unit="kg"
-            highlight
-          />
-          <StatCard
-            icon={<TrendingUp className="w-5 h-5 text-white" />}
-            color="bg-blue-500"
-            label="Produksi Hari Ini"
-            value={formatNumber(stats.todayProduction)}
-            unit="butir"
-          />
-          <StatCard
-            icon={<ShoppingCart className="w-5 h-5 text-white" />}
-            color="bg-purple-500"
-            label="Penjualan Hari Ini"
-            value={formatNumber(stats.todaySales)}
-            unit="kg"
-          />
-          <StatCard
-            icon={<Skull className="w-5 h-5 text-white" />}
-            color="bg-red-400"
-            label="Kematian Hari Ini"
-            value={formatNumber(stats.todayMortality)}
-            unit="ekor"
-          />
-        </div>
-
-        {/* Feed stock */}
-        {stats.feedStocks.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2 pt-4 px-4">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Wheat className="w-4 h-4 text-green-600" />
-                Stok Pakan
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="space-y-2">
-                {stats.feedStocks.map((feed) => (
-                  <div key={feed.productId} className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">{feed.productName}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm">
-                        {formatNumber(feed.stock)}
-                      </span>
-                      <span className="text-xs text-gray-400">{feed.unit}</span>
-                      {feed.stock < 100 && (
-                        <Badge variant="destructive" className="text-xs px-1.5 py-0">
-                          Rendah
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
+        {/* Per-kandang report */}
+        <Card>
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <ClipboardList className="w-4 h-4 text-green-600" />
+              Laporan Produksi & Penjualan
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-2 pb-4 overflow-x-auto">
+            <table className="w-full text-xs whitespace-nowrap">
+              <thead>
+                <tr className="text-gray-500 border-b">
+                  <th className="text-left font-medium px-2 py-1.5">Kandang</th>
+                  <th className="text-right font-medium px-2 py-1.5">Populasi</th>
+                  <th className="text-right font-medium px-2 py-1.5">Mati</th>
+                  <th className="text-right font-medium px-2 py-1.5">Pakan (kg)</th>
+                  <th className="text-right font-medium px-2 py-1.5">Telur Bagus (kg)</th>
+                  <th className="text-right font-medium px-2 py-1.5">Telur Retak (kg)</th>
+                  <th className="text-right font-medium px-2 py-1.5">Jual Bagus (kg)</th>
+                  <th className="text-right font-medium px-2 py-1.5">Jual Retak (kg)</th>
+                  <th className="text-right font-medium px-2 py-1.5">Stok Bagus (kg)</th>
+                  <th className="text-right font-medium px-2 py-1.5">Stok Retak (kg)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.houseReport.map((h) => (
+                  <tr key={h.house} className="border-b last:border-b-0">
+                    <td className="px-2 py-1.5 font-medium text-gray-800">{h.house}</td>
+                    <td className="px-2 py-1.5 text-right">{h.populasi != null ? formatNumber(h.populasi) : "-"}</td>
+                    <td className="px-2 py-1.5 text-right">{formatNumber(h.mati)}</td>
+                    <td className="px-2 py-1.5 text-right">{formatNumber(h.pakanKg)}</td>
+                    <td className="px-2 py-1.5 text-right">{formatNumber(h.telurBagusKg)}</td>
+                    <td className="px-2 py-1.5 text-right">{formatNumber(h.telurRetakKg)}</td>
+                    <td className="px-2 py-1.5 text-right text-gray-400">-</td>
+                    <td className="px-2 py-1.5 text-right text-gray-400">-</td>
+                    <td className="px-2 py-1.5 text-right text-gray-400">-</td>
+                    <td className="px-2 py-1.5 text-right text-gray-400">-</td>
+                  </tr>
                 ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Monthly stats — owner only */}
-        {isOwner && (
-          <div className="grid grid-cols-2 gap-3">
-            <Card className="p-4">
-              <p className="text-xs text-gray-500">Produksi Bulan Ini</p>
-              <p className="text-xl font-bold text-gray-800 mt-1">
-                {formatNumber(stats.monthlyProduction)}
-                <span className="text-xs font-normal text-gray-400 ml-1">butir</span>
-              </p>
-            </Card>
-            <Card className="p-4">
-              <p className="text-xs text-gray-500">Kematian Bulan Ini</p>
-              <p className="text-xl font-bold text-gray-800 mt-1">
-                {formatNumber(stats.monthlyMortality)}
-                <span className="text-xs font-normal text-gray-400 ml-1">ekor</span>
-              </p>
-            </Card>
-          </div>
-        )}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 font-semibold text-gray-800">
+                  <td className="px-2 py-1.5">Total</td>
+                  <td className="px-2 py-1.5 text-right">
+                    {formatNumber(stats.houseReport.reduce((sum, h) => sum + (h.populasi ?? 0), 0))}
+                  </td>
+                  <td className="px-2 py-1.5 text-right">
+                    {formatNumber(stats.houseReport.reduce((sum, h) => sum + h.mati, 0))}
+                  </td>
+                  <td className="px-2 py-1.5 text-right">
+                    {formatNumber(stats.houseReport.reduce((sum, h) => sum + h.pakanKg, 0))}
+                  </td>
+                  <td className="px-2 py-1.5 text-right">
+                    {formatNumber(stats.houseReport.reduce((sum, h) => sum + h.telurBagusKg, 0))}
+                  </td>
+                  <td className="px-2 py-1.5 text-right">
+                    {formatNumber(stats.houseReport.reduce((sum, h) => sum + h.telurRetakKg, 0))}
+                  </td>
+                  <td className="px-2 py-1.5 text-right">{formatNumber(stats.jualBagusKg)}</td>
+                  <td className="px-2 py-1.5 text-right">{formatNumber(stats.jualRetakKg)}</td>
+                  <td className="px-2 py-1.5 text-right">{formatNumber(stats.stokTelurBagus)}</td>
+                  <td className="px-2 py-1.5 text-right">{formatNumber(stats.stokTelurRetak)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </CardContent>
+        </Card>
 
         {/* Charts — client component, owner only */}
         {isOwner && (
@@ -154,35 +129,5 @@ export default async function DashboardPage() {
         <div className="h-4" />
       </div>
     </>
-  );
-}
-
-function StatCard({
-  icon, color, label, value, unit, highlight,
-}: {
-  icon: React.ReactNode;
-  color: string;
-  label: string;
-  value: string;
-  unit: string;
-  highlight?: boolean;
-}) {
-  return (
-    <Card className={highlight ? "border-green-200 bg-green-50" : ""}>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-lg ${color} flex items-center justify-center shrink-0`}>
-            {icon}
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs text-gray-500 truncate">{label}</p>
-            <p className={`font-bold ${highlight ? "text-green-700 text-xl" : "text-gray-800 text-lg"}`}>
-              {value}
-              <span className="text-xs font-normal text-gray-400 ml-1">{unit}</span>
-            </p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }

@@ -192,6 +192,11 @@ export async function deleteFeedPurchase(id: string) {
   await prisma.feedPurchase.delete({ where: { id } });
 }
 
+export async function deleteFeedPurchases(ids: string[]) {
+  const result = await prisma.feedPurchase.deleteMany({ where: { id: { in: ids } } });
+  return result.count;
+}
+
 // ─── Feed Usage ───────────────────────────────────────────────────────────────
 
 export async function getFeedUsages(params?: {
@@ -425,4 +430,9 @@ export async function updateFeedSale(
 
 export async function deleteFeedSale(id: string) {
   await prisma.feedSale.delete({ where: { id } });
+}
+
+export async function deleteFeedSales(ids: string[]) {
+  const result = await prisma.feedSale.deleteMany({ where: { id: { in: ids } } });
+  return result.count;
 }

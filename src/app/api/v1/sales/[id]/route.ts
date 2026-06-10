@@ -42,6 +42,7 @@ export async function PUT(
           ? (body.jatuhTempoDays === null || body.jatuhTempoDays === "" ? null : parseInt(body.jatuhTempoDays))
           : undefined,
       notes: body.notes,
+      eggType: body.eggType !== undefined ? (body.eggType || null) : undefined,
     });
 
     return NextResponse.json({ success: true, data: record });

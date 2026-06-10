@@ -22,6 +22,7 @@ export async function PUT(
       role: body.role,
       isActive: body.isActive,
       companyName: body.companyName ?? null,
+      notes: body.notes ?? null,
     });
 
     return NextResponse.json({ success: true, data });

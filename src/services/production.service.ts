@@ -367,6 +367,48 @@ export async function getProductionTrendByHouse(days = 90) {
   return Object.values(grouped);
 }
 
+export interface HouseReport {
+  house: string;
+  populasi: number | null;
+  mati: number;
+  pakanKg: number;
+  telurBagusKg: number;
+  telurRetakKg: number;
+}
+
+// Ringkasan per kandang untuk dashboard: Populasi diambil dari catatan terakhir
+// (urut tanggal), sedangkan Mati/Pakan/Telur Bagus/Telur Retak adalah total kumulatif.
+export async function getProductionReportByHouse(): Promise<HouseReport[]> {
+  const records = await prisma.eggProduction.findMany({
+    select: {
+      house: true,
+      date: true,
+      populasi: true,
+      mortality: true,
+      feedQtyKg: true,
+      goodEggsKg: true,
+      crackedEggsKg: true,
+    },
+    orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+  });
+
+  const map = new Map<string, HouseReport>();
+  for (const r of records) {
+    let entry = map.get(r.house);
+    if (!entry) {
+      entry = { house: r.house, populasi: null, mati: 0, pakanKg: 0, telurBagusKg: 0, telurRetakKg: 0 };
+      map.set(r.house, entry);
+    }
+    entry.mati += r.mortality ?? 0;
+    entry.pakanKg += decimalToNumber(r.feedQtyKg);
+    entry.telurBagusKg += decimalToNumber(r.goodEggsKg);
+    entry.telurRetakKg += decimalToNumber(r.crackedEggsKg);
+    if (r.populasi != null) entry.populasi = r.populasi;
+  }
+
+  return Array.from(map.values()).sort((a, b) => a.house.localeCompare(b.house));
+}
+
 export interface DailyMetric {
   id: string;
   date: string;

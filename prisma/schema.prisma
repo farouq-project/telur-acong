@@ -38,6 +38,7 @@ model User {
   role        Role     @default(STAFF)
   isActive    Boolean  @default(true)
   companyName String?
+  notes       String?  @db.Text
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -81,6 +82,7 @@ model EggSale {
   customerName String
   invoiceNo    String?
   jatuhTempoDays Int?
+  eggType      String?
   qtySold      Decimal  @db.Decimal(10, 2)
   unitPrice    Decimal  @db.Decimal(12, 2)
   totalValue   Decimal  @db.Decimal(14, 2)

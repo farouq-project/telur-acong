@@ -37,12 +37,15 @@ export interface EggProduction {
   updatedAt?: string;
 }
 
+export type EggType = "TELUR_BAGUS" | "TELUR_RETAK" | "TELUR_BULE";
+
 export interface EggSale {
   id: string;
   date: string;
   customerName: string;
   invoiceNo?: string | null;
   jatuhTempoDays?: number | null;
+  eggType?: EggType | null;
   qtySold: number;
   unitPrice: number;
   totalValue: number;
@@ -168,6 +171,7 @@ export interface User {
   role: UserRole;
   isActive: boolean;
   companyName?: string | null;
+  notes?: string | null;
   password?: string;
   createdAt: string;
 }

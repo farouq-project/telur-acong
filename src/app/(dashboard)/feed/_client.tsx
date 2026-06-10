@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Edit2, Trash2, Loader2, ShoppingBag, Wheat, ShoppingCart } from "lucide-react";
+import {
+  Plus, Edit2, Trash2, Loader2, ShoppingBag, ShoppingCart,
+  ArrowUpDown, ArrowUp, ArrowDown, ListChecks, CheckSquare, Square, ListFilter,
+} from "lucide-react";
 import { MobileHeader } from "@/components/layout/MobileHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +18,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate, formatNumber, formatRupiah, todayISO } from "@/lib/utils";
 import type { FeedProduct, FeedPurchase, FeedUsage, FeedSale } from "@/types";
@@ -51,6 +58,201 @@ interface Props {
   initialFeedSales: FeedSale[];
 }
 
+function SortIcon({ col, sortCol, sortDir }: { col: string; sortCol: string; sortDir: "asc" | "desc" }) {
+  if (col !== sortCol) return <ArrowUpDown className="w-3 h-3 text-gray-300 ml-0.5 inline-block" />;
+  return sortDir === "asc"
+    ? <ArrowUp className="w-3 h-3 text-green-600 ml-0.5 inline-block" />
+    : <ArrowDown className="w-3 h-3 text-green-600 ml-0.5 inline-block" />;
+}
+
+function Th({ col, label, align, sortCol, sortDir, onSort }: {
+  col: string; label: string; align?: "right"; sortCol: string; sortDir: "asc" | "desc"; onSort: (col: string) => void;
+}) {
+  return (
+    <th
+      className={`px-2 py-2 font-semibold text-gray-600 whitespace-nowrap select-none cursor-pointer hover:bg-gray-100 active:bg-gray-200 border-b border-gray-200 ${align === "right" ? "text-right" : "text-left"}`}
+      onClick={() => onSort(col)}
+    >
+      {label}
+      <SortIcon col={col} sortCol={sortCol} sortDir={sortDir} />
+    </th>
+  );
+}
+
+function SelectCell({ checked, onToggle }: { checked: boolean; onToggle: () => void }) {
+  return (
+    <td className="px-2 py-1.5 text-center" onClick={(e) => { e.stopPropagation(); onToggle(); }}>
+      {checked
+        ? <CheckSquare className="w-4 h-4 text-green-600 inline" />
+        : <Square className="w-4 h-4 text-gray-300 inline" />}
+    </td>
+  );
+}
+
+function PurchaseTable({
+  records, sortCol, sortDir, selectMode, selectedIds, isOwner,
+  onSort, onToggleSelected, onEdit, onDelete,
+}: {
+  records: FeedPurchase[]; sortCol: string; sortDir: "asc" | "desc"; selectMode: boolean; selectedIds: string[]; isOwner: boolean;
+  onSort: (col: string) => void; onToggleSelected: (id: string) => void; onEdit: (r: FeedPurchase) => void; onDelete: (id: string) => void;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+      <table className="w-full border-collapse text-[11px]" style={{ minWidth: 640 }}>
+        <thead className="bg-gray-50 sticky top-0 z-10">
+          <tr>
+            {selectMode && <th className="w-8 px-2 py-2 border-b border-gray-200" />}
+            <Th col="date" label="Tanggal" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <Th col="product" label="Produk" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <Th col="qty" label="Jumlah" align="right" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <Th col="pricePerKg" label="Harga/kg" align="right" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <Th col="totalValue" label="Total" align="right" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <th className="px-2 py-2 text-left font-semibold text-gray-600 border-b border-gray-200 whitespace-nowrap">Catatan</th>
+            <th className="px-2 py-2 border-b border-gray-200 w-16" />
+          </tr>
+        </thead>
+        <tbody>
+          {records.map((r, idx) => {
+            const isSelected = selectedIds.includes(r.id);
+            const rowCls = [
+              idx % 2 === 1 ? "bg-gray-50/60" : "bg-white",
+              isSelected ? "!bg-green-50" : "",
+              selectMode ? "cursor-pointer" : "",
+              "border-b border-gray-100 hover:bg-blue-50/30 transition-colors",
+            ].join(" ");
+            return (
+              <tr key={r.id} className={rowCls} onClick={selectMode ? () => onToggleSelected(r.id) : undefined}>
+                {selectMode && <SelectCell checked={isSelected} onToggle={() => onToggleSelected(r.id)} />}
+                <td className="px-2 py-1.5 whitespace-nowrap text-gray-500">{formatDate(r.date)}</td>
+                <td className="px-2 py-1.5 whitespace-nowrap font-medium text-gray-800">{(r.feedProduct as FeedProduct)?.name ?? ""}</td>
+                <td className="px-2 py-1.5 text-right font-mono">{formatNumber(r.qty)} {(r.feedProduct as FeedProduct)?.unit ?? "kg"}</td>
+                <td className="px-2 py-1.5 text-right font-mono">{r.pricePerKg != null ? formatRupiah(r.pricePerKg) : <span className="text-gray-300">—</span>}</td>
+                <td className="px-2 py-1.5 text-right font-mono text-green-700 font-semibold">{r.totalValue != null ? formatRupiah(r.totalValue) : <span className="text-gray-300">—</span>}</td>
+                <td className="px-2 py-1.5 max-w-[100px]"><span className="truncate block text-gray-400">{r.notes ?? ""}</span></td>
+                <td className="px-2 py-1.5">
+                  {!selectMode && (
+                    <div className="flex gap-0.5 justify-end">
+                      <button onClick={(e) => { e.stopPropagation(); onEdit(r); }} className="p-1 rounded hover:bg-gray-100">
+                        <Edit2 className="w-3.5 h-3.5 text-gray-400" />
+                      </button>
+                      {isOwner && (
+                        <button onClick={(e) => { e.stopPropagation(); onDelete(r.id); }} className="p-1 rounded hover:bg-red-50">
+                          <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div className="px-3 py-1.5 text-[10px] text-gray-400 border-t border-gray-100">{records.length} baris</div>
+    </div>
+  );
+}
+
+function UsageTable({ records, sortCol, sortDir, onSort }: {
+  records: FeedUsage[]; sortCol: string; sortDir: "asc" | "desc"; onSort: (col: string) => void;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+      <table className="w-full border-collapse text-[11px]" style={{ minWidth: 700 }}>
+        <thead className="bg-gray-50 sticky top-0 z-10">
+          <tr>
+            <Th col="date" label="Tanggal" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <Th col="house" label="Kandang" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <Th col="product" label="Produk" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <Th col="qtyUsed" label="Jumlah" align="right" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <Th col="unitCost" label="Biaya/kg" align="right" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <Th col="totalCost" label="Total Biaya" align="right" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <th className="px-2 py-2 text-left font-semibold text-gray-600 border-b border-gray-200 whitespace-nowrap">Catatan</th>
+          </tr>
+        </thead>
+        <tbody>
+          {records.map((r, idx) => (
+            <tr key={r.id} className={`${idx % 2 === 1 ? "bg-gray-50/60" : "bg-white"} border-b border-gray-100`}>
+              <td className="px-2 py-1.5 whitespace-nowrap text-gray-500">{formatDate(r.date)}</td>
+              <td className="px-2 py-1.5 whitespace-nowrap font-medium text-gray-800">{r.house}</td>
+              <td className="px-2 py-1.5 whitespace-nowrap text-gray-700">{(r.feedProduct as FeedProduct)?.name ?? ""}</td>
+              <td className="px-2 py-1.5 text-right font-mono text-amber-600">{formatNumber(r.qtyUsed)} {(r.feedProduct as FeedProduct)?.unit ?? "kg"}</td>
+              <td className="px-2 py-1.5 text-right font-mono">{r.unitCost != null ? formatRupiah(r.unitCost) : <span className="text-gray-300">—</span>}</td>
+              <td className="px-2 py-1.5 text-right font-mono text-amber-700 font-semibold">{r.totalCost != null ? formatRupiah(r.totalCost) : <span className="text-gray-300">—</span>}</td>
+              <td className="px-2 py-1.5 max-w-[100px]"><span className="truncate block text-gray-400">{r.notes ?? ""}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="px-3 py-1.5 text-[10px] text-gray-400 border-t border-gray-100">{records.length} baris</div>
+    </div>
+  );
+}
+
+function SaleTable({
+  records, sortCol, sortDir, selectMode, selectedIds, isOwner,
+  onSort, onToggleSelected, onEdit, onDelete,
+}: {
+  records: FeedSale[]; sortCol: string; sortDir: "asc" | "desc"; selectMode: boolean; selectedIds: string[]; isOwner: boolean;
+  onSort: (col: string) => void; onToggleSelected: (id: string) => void; onEdit: (r: FeedSale) => void; onDelete: (id: string) => void;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+      <table className="w-full border-collapse text-[11px]" style={{ minWidth: 700 }}>
+        <thead className="bg-gray-50 sticky top-0 z-10">
+          <tr>
+            {selectMode && <th className="w-8 px-2 py-2 border-b border-gray-200" />}
+            <Th col="date" label="Tanggal" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <Th col="customerName" label="Pelanggan" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <Th col="product" label="Produk" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <Th col="qty" label="Jumlah" align="right" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <Th col="unitPrice" label="Harga" align="right" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <Th col="totalValue" label="Total" align="right" sortCol={sortCol} sortDir={sortDir} onSort={onSort} />
+            <th className="px-2 py-2 border-b border-gray-200 w-16" />
+          </tr>
+        </thead>
+        <tbody>
+          {records.map((r, idx) => {
+            const isSelected = selectedIds.includes(r.id);
+            const rowCls = [
+              idx % 2 === 1 ? "bg-gray-50/60" : "bg-white",
+              isSelected ? "!bg-green-50" : "",
+              selectMode ? "cursor-pointer" : "",
+              "border-b border-gray-100 hover:bg-blue-50/30 transition-colors",
+            ].join(" ");
+            return (
+              <tr key={r.id} className={rowCls} onClick={selectMode ? () => onToggleSelected(r.id) : undefined}>
+                {selectMode && <SelectCell checked={isSelected} onToggle={() => onToggleSelected(r.id)} />}
+                <td className="px-2 py-1.5 whitespace-nowrap text-gray-500">{formatDate(r.date)}</td>
+                <td className="px-2 py-1.5 whitespace-nowrap font-medium text-gray-800">{r.customerName}</td>
+                <td className="px-2 py-1.5 whitespace-nowrap text-gray-700">{(r.feedProduct as FeedProduct)?.name ?? ""}</td>
+                <td className="px-2 py-1.5 text-right font-mono">{formatNumber(r.qty)} {(r.feedProduct as FeedProduct)?.unit ?? "kg"}</td>
+                <td className="px-2 py-1.5 text-right font-mono">{formatRupiah(r.unitPrice)}</td>
+                <td className="px-2 py-1.5 text-right font-mono text-purple-600 font-semibold">{formatRupiah(r.totalValue)}</td>
+                <td className="px-2 py-1.5">
+                  {!selectMode && (
+                    <div className="flex gap-0.5 justify-end">
+                      <button onClick={(e) => { e.stopPropagation(); onEdit(r); }} className="p-1 rounded hover:bg-gray-100">
+                        <Edit2 className="w-3.5 h-3.5 text-gray-400" />
+                      </button>
+                      {isOwner && (
+                        <button onClick={(e) => { e.stopPropagation(); onDelete(r.id); }} className="p-1 rounded hover:bg-red-50">
+                          <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div className="px-3 py-1.5 text-[10px] text-gray-400 border-t border-gray-100">{records.length} baris</div>
+    </div>
+  );
+}
+
 export default function FeedClient({ initialProducts, initialPurchases, initialUsages, initialFeedSales }: Props) {
   const { data: session } = useSession();
   const { toast } = useToast();
@@ -65,6 +267,18 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const [activeTab, setActiveTab] = useState<"purchases" | "usage" | "sales" | "products">("purchases");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [pageSize, setPageSize] = useState<"50" | "100" | "200" | "all">("50");
+  const [filterHouses, setFilterHouses] = useState<string[]>([]);
+  const [sortCol, setSortCol] = useState("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkDeleteOpen, setBulkDeleting2Open] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
   const purchaseForm = useForm<PurchaseForm>({ resolver: zodResolver(purchaseSchema), defaultValues: { date: todayISO(), feedProductId: "", qty: 0, pricePerKg: "", notes: "" } });
   const saleForm = useForm<SaleForm>({ resolver: zodResolver(saleSchema), defaultValues: { date: todayISO(), customerName: "", feedProductId: "", qty: 0, unitPrice: 0 } });
   const productForm = useForm<ProductForm>({ resolver: zodResolver(productSchema), defaultValues: { name: "", unit: "kg" } });
@@ -72,11 +286,16 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
   const fetchAll = useCallback(async () => {
     setFetching(true);
     try {
+      const params = new URLSearchParams();
+      if (dateFrom) params.set("from", dateFrom);
+      if (dateTo) params.set("to", dateTo);
+      const limit = pageSize === "all" ? "5000" : pageSize;
+      params.set("limit", limit);
       const [p, pu, u, s] = await Promise.all([
         fetch("/api/v1/feed-products").then((r) => r.json()),
-        fetch("/api/v1/feed-purchases").then((r) => r.json()),
-        fetch("/api/v1/feed-usage").then((r) => r.json()),
-        fetch("/api/v1/feed-sales").then((r) => r.json()),
+        fetch(`/api/v1/feed-purchases?${params}`).then((r) => r.json()),
+        fetch(`/api/v1/feed-usage?${params}`).then((r) => r.json()),
+        fetch(`/api/v1/feed-sales?${params}`).then((r) => r.json()),
       ]);
       setProducts(p.data ?? []);
       setPurchases(pu.data ?? []);
@@ -85,7 +304,129 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
     } finally {
       setFetching(false);
     }
-  }, []);
+  }, [dateFrom, dateTo, pageSize]);
+
+  useEffect(() => {
+    fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFrom, dateTo, pageSize]);
+
+  function toggleFilterHouse(name: string) {
+    setFilterHouses((prev) => (prev.includes(name) ? prev.filter((h) => h !== name) : [...prev, name]));
+  }
+
+  function changeTab(tab: "purchases" | "usage" | "sales" | "products") {
+    setActiveTab(tab);
+    setSortCol("date");
+    setSortDir("desc");
+    setSelectMode(false);
+    setSelectedIds([]);
+  }
+
+  function handleSort(col: string) {
+    if (sortCol === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortCol(col); setSortDir("asc"); }
+  }
+
+  function sortByCol<T>(records: T[], getValue: (r: T, col: string) => number | string | null): T[] {
+    return [...records].sort((a, b) => {
+      const av = getValue(a, sortCol);
+      const bv = getValue(b, sortCol);
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      if (typeof av === "string" && typeof bv === "string") {
+        return sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+      }
+      return sortDir === "asc" ? (av as number) - (bv as number) : (bv as number) - (av as number);
+    });
+  }
+
+  const displayPurchases = useMemo(() => sortByCol(purchases, (r, col) => {
+    switch (col) {
+      case "date": return r.date;
+      case "product": return (r.feedProduct as FeedProduct)?.name ?? "";
+      case "qty": return r.qty;
+      case "pricePerKg": return r.pricePerKg ?? null;
+      case "totalValue": return r.totalValue ?? null;
+      default: return r.date;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [purchases, sortCol, sortDir]);
+
+  const houseOptions = useMemo(() => Array.from(new Set(usages.map((u) => u.house))).sort(), [usages]);
+
+  const displayUsages = useMemo(() => {
+    const filtered = filterHouses.length > 0 ? usages.filter((u) => filterHouses.includes(u.house)) : usages;
+    return sortByCol(filtered, (r, col) => {
+      switch (col) {
+        case "date": return r.date;
+        case "house": return r.house;
+        case "product": return (r.feedProduct as FeedProduct)?.name ?? "";
+        case "qtyUsed": return r.qtyUsed;
+        case "unitCost": return r.unitCost ?? null;
+        case "totalCost": return r.totalCost ?? null;
+        default: return r.date;
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usages, filterHouses, sortCol, sortDir]);
+
+  const displaySales = useMemo(() => sortByCol(feedSales, (r, col) => {
+    switch (col) {
+      case "date": return r.date;
+      case "customerName": return r.customerName;
+      case "product": return (r.feedProduct as FeedProduct)?.name ?? "";
+      case "qty": return r.qty;
+      case "unitPrice": return r.unitPrice;
+      case "totalValue": return r.totalValue;
+      default: return r.date;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [feedSales, sortCol, sortDir]);
+
+  const visibleIds = activeTab === "purchases" ? displayPurchases.map((r) => r.id)
+    : activeTab === "sales" ? displaySales.map((r) => r.id)
+    : [];
+
+  function toggleSelectMode() {
+    setSelectMode((prev) => {
+      if (prev) setSelectedIds([]);
+      return !prev;
+    });
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function selectAllVisible() {
+    setSelectedIds((prev) => (prev.length === visibleIds.length ? [] : visibleIds));
+  }
+
+  async function confirmBulkDelete() {
+    if (selectedIds.length === 0) return;
+    setBulkDeleting(true);
+    try {
+      const endpoint = activeTab === "purchases" ? "/api/v1/feed-purchases/bulk-delete" : "/api/v1/feed-sales/bulk-delete";
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedIds }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+
+      toast({ variant: "success", title: `${json.count} data dihapus` });
+      setBulkDeleting2Open(false);
+      setSelectedIds([]);
+      setSelectMode(false);
+      fetchAll();
+    } catch (err) {
+      toast({ variant: "destructive", title: "Gagal", description: err instanceof Error ? err.message : "Terjadi kesalahan" });
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
 
   async function submitPurchase(data: PurchaseForm) {
     setSubmitting(true);
@@ -164,76 +505,154 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
     <>
       <MobileHeader title="Manajemen Pakan" />
       <div className="px-4 py-4">
-        <Tabs defaultValue="purchases">
-          <TabsList className="grid grid-cols-4 w-full mb-4">
+        <Tabs value={activeTab} onValueChange={(v) => changeTab(v as typeof activeTab)}>
+          <TabsList className="grid grid-cols-4 w-full mb-3">
             <TabsTrigger value="purchases" className="text-xs">Beli</TabsTrigger>
             <TabsTrigger value="usage" className="text-xs">Pakai</TabsTrigger>
             <TabsTrigger value="sales" className="text-xs">Jual</TabsTrigger>
             <TabsTrigger value="products" className="text-xs">Produk</TabsTrigger>
           </TabsList>
 
+          {(activeTab === "purchases" || activeTab === "usage" || activeTab === "sales") && (
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              {activeTab === "usage" && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs">
+                      <ListFilter className="w-3.5 h-3.5" />
+                      {filterHouses.length === 0
+                        ? "Semua Kandang"
+                        : filterHouses.length === 1
+                          ? filterHouses[0]
+                          : `${filterHouses.length} Kandang`}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuLabel>Filter Kandang</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {houseOptions.map((h) => (
+                      <DropdownMenuCheckboxItem
+                        key={h}
+                        checked={filterHouses.includes(h)}
+                        onCheckedChange={() => toggleFilterHouse(h)}
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        {h}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                    {filterHouses.length > 0 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={() => setFilterHouses([])}>Reset filter kandang</DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+
+              <Input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="h-9 w-[130px] text-xs px-2"
+              />
+              <span className="text-xs text-gray-400">–</span>
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="h-9 w-[130px] text-xs px-2"
+              />
+              {(dateFrom || dateTo) && (
+                <button onClick={() => { setDateFrom(""); setDateTo(""); }} className="text-xs text-gray-400 underline shrink-0">
+                  Reset tanggal
+                </button>
+              )}
+
+              <div className="flex items-center gap-0.5 border border-gray-200 rounded-lg overflow-hidden shrink-0 ml-auto">
+                {(["50", "100", "200", "all"] as const).map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => setPageSize(v)}
+                    className={`px-2 h-9 text-xs font-medium transition-colors ${
+                      pageSize === v ? "bg-green-600 text-white" : "bg-white text-gray-500 hover:bg-gray-50"
+                    }`}
+                  >
+                    {v === "all" ? "Semua" : v}
+                  </button>
+                ))}
+              </div>
+
+              {isOwner && (activeTab === "purchases" || activeTab === "sales") && (
+                <Button
+                  variant={selectMode ? "default" : "outline"}
+                  size="sm"
+                  className={`h-9 gap-1.5 text-xs shrink-0 ${selectMode ? "bg-green-600 hover:bg-green-700" : ""}`}
+                  onClick={toggleSelectMode}
+                >
+                  <ListChecks className="w-3.5 h-3.5" />
+                  {selectMode ? "Batal Pilih" : "Pilih"}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {selectMode && (
+            <div className="flex items-center justify-between bg-green-50 border border-green-100 rounded-xl px-3 py-2 mb-3">
+              <button onClick={selectAllVisible} className="flex items-center gap-1.5 text-xs text-green-700 font-medium">
+                {selectedIds.length > 0 && selectedIds.length === visibleIds.length ? (
+                  <CheckSquare className="w-4 h-4" />
+                ) : (
+                  <Square className="w-4 h-4" />
+                )}
+                Pilih semua ({visibleIds.length})
+              </button>
+              <span className="text-xs text-green-700">{selectedIds.length} dipilih</span>
+            </div>
+          )}
+
           <TabsContent value="purchases" className="space-y-2">
             {fetching ? <div className="h-20 rounded-xl bg-gray-100 animate-pulse" /> :
-              purchases.length === 0 ? <Empty label="Belum ada pembelian pakan" /> :
-              purchases.map((r) => (
-                <FeedRow key={r.id}
-                  icon={<ShoppingBag className="w-4 h-4" />}
-                  accent="green"
-                  label="Pembelian"
-                  title={(r.feedProduct as FeedProduct)?.name ?? ""}
-                  qty={`${formatNumber(r.qty)} ${(r.feedProduct as FeedProduct)?.unit ?? "kg"}`}
-                  detail={
-                    r.pricePerKg != null && r.totalValue != null
-                      ? `Rp${formatNumber(r.pricePerKg)}/kg — ${formatRupiah(r.totalValue)}`
-                      : r.notes || undefined
-                  }
-                  date={r.date}
-                  onEdit={() => openPurchase(r)}
-                  onDelete={() => setDeleteTarget({ id: r.id, type: "purchase" })}
-                  isOwner={isOwner}
-                />
-              ))}
+              displayPurchases.length === 0 ? <Empty label="Belum ada pembelian pakan" /> :
+              <PurchaseTable
+                records={displayPurchases}
+                sortCol={sortCol}
+                sortDir={sortDir}
+                selectMode={selectMode}
+                selectedIds={selectedIds}
+                isOwner={isOwner}
+                onSort={handleSort}
+                onToggleSelected={toggleSelected}
+                onEdit={openPurchase}
+                onDelete={(id) => setDeleteTarget({ id, type: "purchase" })}
+              />
+            }
           </TabsContent>
 
           <TabsContent value="usage" className="space-y-2">
             <p className="text-xs text-gray-400 px-1">Pemakaian terisi otomatis dari catatan Produksi Telur — tab ini hanya untuk pemantauan.</p>
             {fetching ? <div className="h-20 rounded-xl bg-gray-100 animate-pulse" /> :
-              usages.length === 0 ? <Empty label="Belum ada pemakaian pakan" /> :
-              usages.map((r) => (
-                <FeedRow key={r.id}
-                  icon={<Wheat className="w-4 h-4" />}
-                  accent="amber"
-                  label="Pemakaian"
-                  title={(r.feedProduct as FeedProduct)?.name ?? ""}
-                  qty={`${formatNumber(r.qtyUsed)} ${(r.feedProduct as FeedProduct)?.unit ?? "kg"}`}
-                  detail={
-                    r.totalCost != null
-                      ? `Kandang ${r.house} — ${formatRupiah(r.totalCost)} (Rp${formatNumber(r.unitCost ?? 0)}/kg, FIFO)`
-                      : `Kandang ${r.house}`
-                  }
-                  date={r.date}
-                  isOwner={isOwner}
-                />
-              ))}
+              displayUsages.length === 0 ? <Empty label="Belum ada pemakaian pakan" /> :
+              <UsageTable records={displayUsages} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+            }
           </TabsContent>
 
           <TabsContent value="sales" className="space-y-2">
             {fetching ? <div className="h-20 rounded-xl bg-gray-100 animate-pulse" /> :
-              feedSales.length === 0 ? <Empty label="Belum ada penjualan pakan" /> :
-              feedSales.map((r) => (
-                <FeedRow key={r.id}
-                  icon={<ShoppingCart className="w-4 h-4" />}
-                  accent="purple"
-                  label="Penjualan"
-                  title={r.customerName}
-                  qty={`${(r.feedProduct as FeedProduct)?.name ?? ""} — ${formatNumber(r.qty)}`}
-                  detail={formatRupiah(r.totalValue)}
-                  date={r.date}
-                  onEdit={() => openSale(r)}
-                  onDelete={() => setDeleteTarget({ id: r.id, type: "sale" })}
-                  isOwner={isOwner}
-                />
-              ))}
+              displaySales.length === 0 ? <Empty label="Belum ada penjualan pakan" /> :
+              <SaleTable
+                records={displaySales}
+                sortCol={sortCol}
+                sortDir={sortDir}
+                selectMode={selectMode}
+                selectedIds={selectedIds}
+                isOwner={isOwner}
+                onSort={handleSort}
+                onToggleSelected={toggleSelected}
+                onEdit={openSale}
+                onDelete={(id) => setDeleteTarget({ id, type: "sale" })}
+              />
+            }
           </TabsContent>
 
           <TabsContent value="products" className="space-y-2">
@@ -254,13 +673,28 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
         </Tabs>
       </div>
 
-      <button
-        onClick={() => setChooserOpen(true)}
-        className="fixed bottom-20 right-5 z-30 w-14 h-14 rounded-full bg-green-600 hover:bg-green-700 text-white shadow-lg flex items-center justify-center transition-colors"
-        aria-label="Tambah catatan pakan"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
+      {selectMode && selectedIds.length > 0 ? (
+        <div
+          className="fixed left-0 right-0 z-30 px-4 flex justify-center"
+          style={{ bottom: "calc(4.5rem + env(safe-area-inset-bottom))" }}
+        >
+          <div className="bg-white border border-gray-200 shadow-lg rounded-2xl px-4 py-3 flex items-center gap-3 max-w-md w-full">
+            <span className="text-sm text-gray-600 flex-1">{selectedIds.length} data dipilih</span>
+            <Button variant="outline" size="sm" onClick={() => setSelectedIds([])}>Batal</Button>
+            <Button variant="destructive" size="sm" onClick={() => setBulkDeleting2Open(true)} className="gap-1.5">
+              <Trash2 className="w-4 h-4" /> Hapus
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setChooserOpen(true)}
+          className="fixed bottom-20 right-5 z-30 w-14 h-14 rounded-full bg-green-600 hover:bg-green-700 text-white shadow-lg flex items-center justify-center transition-colors"
+          aria-label="Tambah catatan pakan"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      )}
 
       <Sheet open={chooserOpen} onOpenChange={setChooserOpen}>
         <SheetContent side="bottom" className="rounded-t-2xl">
@@ -381,6 +815,19 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={bulkDeleteOpen} onOpenChange={setBulkDeleting2Open}>
+        <DialogContent className="max-w-sm mx-4">
+          <DialogHeader><DialogTitle>Hapus {selectedIds.length} Data?</DialogTitle></DialogHeader>
+          <p className="text-sm text-gray-500">{selectedIds.length} data yang dipilih akan dihapus permanen.</p>
+          <DialogFooter className="flex-row gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setBulkDeleting2Open(false)}>Batal</Button>
+            <Button variant="destructive" className="flex-1" onClick={confirmBulkDelete} disabled={bulkDeleting}>
+              {bulkDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : `Hapus ${selectedIds.length} Data`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -390,38 +837,6 @@ const ACCENT_STYLES: Record<string, { bg: string; text: string; border: string }
   amber: { bg: "bg-amber-50", text: "text-amber-700", border: "border-l-amber-400" },
   purple: { bg: "bg-purple-50", text: "text-purple-700", border: "border-l-purple-400" },
 };
-
-function FeedRow({ icon, accent, label, title, qty, detail, date, onEdit, onDelete, isOwner }: {
-  icon: React.ReactNode; accent: "green" | "amber" | "purple"; label: string;
-  title: string; qty: string; detail?: string; date: string;
-  onEdit?: () => void; onDelete?: () => void; isOwner: boolean;
-}) {
-  const a = ACCENT_STYLES[accent];
-  return (
-    <div className={`bg-white rounded-xl p-3.5 border border-gray-100 border-l-4 ${a.border} shadow-sm flex items-center gap-3`}>
-      <div className={`w-9 h-9 rounded-lg ${a.bg} ${a.text} flex items-center justify-center shrink-0`}>
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
-          <span className={`text-[10px] font-medium uppercase tracking-wide ${a.text}`}>{label}</span>
-          <span className="text-[11px] text-gray-400 shrink-0">{formatDate(date)}</span>
-        </div>
-        <p className="font-semibold text-gray-800 text-sm truncate mt-0.5">{title}</p>
-        <div className="flex items-center justify-between gap-2 mt-0.5">
-          <p className="text-xs text-gray-600 truncate">{qty}</p>
-          {detail && <p className="text-xs text-gray-400 truncate shrink-0">{detail}</p>}
-        </div>
-      </div>
-      {(onEdit || onDelete) && (
-        <div className="flex flex-col gap-0.5 shrink-0">
-          {onEdit && <button onClick={onEdit} className="p-1.5 rounded-lg hover:bg-gray-100"><Edit2 className="w-3.5 h-3.5 text-gray-400" /></button>}
-          {onDelete && isOwner && <button onClick={onDelete} className="p-1.5 rounded-lg hover:bg-red-50"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function Empty({ label }: { label: string }) {
   return <div className="text-center py-12 text-gray-400 text-sm">{label}</div>;

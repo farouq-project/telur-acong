@@ -10,6 +10,7 @@ import { MobileHeader } from "@/components/layout/MobileHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -29,6 +30,7 @@ const createSchema = z.object({
   password: z.string().min(6),
   role: z.enum(["DEVELOPER", "OWNER", "STAFF"]),
   companyName: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 const editSchema = z.object({
@@ -37,6 +39,7 @@ const editSchema = z.object({
   role: z.enum(["DEVELOPER", "OWNER", "STAFF"]),
   isActive: z.boolean(),
   companyName: z.string().optional(),
+  notes: z.string().optional(),
   newPassword: z.string().optional(),
 });
 
@@ -58,12 +61,12 @@ export default function UsersPage() {
 
   const createForm = useForm<CreateForm>({
     resolver: zodResolver(createSchema),
-    defaultValues: { name: "", email: "", password: "", role: "STAFF", companyName: "" },
+    defaultValues: { name: "", email: "", password: "", role: "STAFF", companyName: "", notes: "" },
   });
 
   const editForm = useForm<EditForm>({
     resolver: zodResolver(editSchema),
-    defaultValues: { name: "", email: "", role: "STAFF", isActive: true, companyName: "", newPassword: "" },
+    defaultValues: { name: "", email: "", role: "STAFF", isActive: true, companyName: "", notes: "", newPassword: "" },
   });
 
   async function fetchUsers() {
@@ -81,7 +84,7 @@ export default function UsersPage() {
       const res = await fetch("/api/v1/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, companyName: data.companyName || null }),
+        body: JSON.stringify({ ...data, companyName: data.companyName || null, notes: data.notes || null }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
@@ -105,6 +108,7 @@ export default function UsersPage() {
           role: data.role,
           isActive: data.isActive,
           companyName: data.companyName || null,
+          notes: data.notes || null,
         }),
       });
       const json = await res.json();
@@ -137,6 +141,7 @@ export default function UsersPage() {
       role: user.role,
       isActive: user.isActive,
       companyName: user.companyName ?? "",
+      notes: user.notes ?? "",
       newPassword: "",
     });
     setEditingId(user.id);
@@ -224,6 +229,10 @@ export default function UsersPage() {
               <Input className="h-11" placeholder="Opsional" {...createForm.register("companyName")} />
             </div>
             <div className="space-y-1.5">
+              <Label>Catatan</Label>
+              <Textarea placeholder="Opsional — alamat, kontak, dll." rows={2} {...createForm.register("notes")} />
+            </div>
+            <div className="space-y-1.5">
               <Label>Role</Label>
               <Select onValueChange={(v) => createForm.setValue("role", v as CreateForm["role"])} value={createForm.watch("role")}>
                 <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
@@ -260,6 +269,10 @@ export default function UsersPage() {
             <div className="space-y-1.5">
               <Label>Nama Perusahaan</Label>
               <Input className="h-11" placeholder="Opsional" {...editForm.register("companyName")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Catatan</Label>
+              <Textarea placeholder="Opsional — alamat, kontak, dll." rows={2} {...editForm.register("notes")} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">

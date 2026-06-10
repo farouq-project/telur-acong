@@ -8,6 +8,7 @@ const USER_SELECT_BASE = {
   role: true,
   isActive: true,
   companyName: true,
+  notes: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -19,6 +20,7 @@ function serializeUser(u: {
   role: string;
   isActive: boolean;
   companyName: string | null;
+  notes: string | null;
   createdAt: Date;
   updatedAt: Date;
   password?: string;
@@ -53,6 +55,7 @@ export async function createUser(input: {
   password: string;
   role: "DEVELOPER" | "OWNER" | "STAFF";
   companyName?: string;
+  notes?: string;
 }) {
   const existing = await prisma.user.findUnique({ where: { email: input.email } });
   if (existing) throw new Error("Email sudah digunakan");
@@ -65,6 +68,7 @@ export async function createUser(input: {
       password: passwordHash,
       role: input.role,
       companyName: input.companyName ?? null,
+      notes: input.notes ?? null,
     },
     select: USER_SELECT_BASE,
   });
@@ -79,6 +83,7 @@ export async function updateUser(
     role?: "DEVELOPER" | "OWNER" | "STAFF";
     isActive?: boolean;
     companyName?: string | null;
+    notes?: string | null;
   }
 ) {
   if (input.email) {
