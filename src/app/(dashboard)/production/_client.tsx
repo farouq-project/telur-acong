@@ -201,7 +201,7 @@ const TABLE_COLS: { key: string; label: string; align?: "right" }[] = [
   { key: "feedQtyKg",    label: "Pakan (kg)",  align: "right" },
   { key: "populasi",     label: "Populasi",    align: "right" },
   { key: "mortality",    label: "Mati",        align: "right" },
-  { key: "umurAyam",     label: "Umur (hr)",   align: "right" },
+  { key: "umurAyam",     label: "Umur (mgg)",  align: "right" },
   { key: "hd",           label: "HD %",        align: "right" },
   { key: "fi",           label: "FI",          align: "right" },
   { key: "fcr",          label: "FCR",         align: "right" },
@@ -625,7 +625,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedHouse, watchedMortality, editingId, records, houses]);
 
-  // Auto-isi Umur Ayam = umur ayam catatan sebelumnya + selisih hari
+  // Auto-isi Umur Ayam = umur ayam catatan sebelumnya + selisih minggu (1 minggu = 7 hari)
   useEffect(() => {
     if (editingId) return;
     if (!watchedHouse || !watchedDate) return;
@@ -638,7 +638,8 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
       const daysDiff = Math.round(
         (new Date(watchedDate).getTime() - new Date(previousRecord.date).getTime()) / 86400000
       );
-      form.setValue("umurAyam", Math.max(0, previousRecord.umurAyam + daysDiff));
+      const weeksDiff = Math.floor(daysDiff / 7);
+      form.setValue("umurAyam", Math.max(0, previousRecord.umurAyam + weeksDiff));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedHouse, watchedDate, editingId, records]);
@@ -912,7 +913,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
                   <Input type="number" min="0" className="h-11" placeholder="0" {...form.register("mortality")} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Umur Ayam (hr)</Label>
+                  <Label className="text-xs">Umur Ayam (mgg)</Label>
                   <Input type="number" min="0" className="h-11" placeholder="0" {...form.register("umurAyam")} />
                 </div>
               </div>

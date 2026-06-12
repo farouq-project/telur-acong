@@ -5,8 +5,8 @@ export const ROLE_ALLOWED_PATHS: Record<UserRole, string[] | null> = {
   DEVELOPER: null,
   OWNER: null,
   STAFF: null,
-  FARM_HEAD: ["/production", "/medicine", "/vaccination", "/mortality", "/more", "/settings"],
-  QA_HEAD: ["/dashboard", "/sales", "/so-telur", "/more", "/settings"],
+  FARM_HEAD: ["/production", "/medicine", "/vaccination", "/mortality", "/feed", "/more", "/settings"],
+  QA_HEAD: ["/dashboard", "/sales", "/so-telur", "/financial", "/more", "/settings"],
 };
 
 export const ROLE_HOME: Record<UserRole, string> = {

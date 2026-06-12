@@ -5,6 +5,7 @@ import { MobileHeader } from "@/components/layout/MobileHeader";
 import { RefreshButton } from "@/components/layout/RefreshButton";
 import { DashboardCharts } from "./DashboardCharts";
 import { HouseReportCard } from "./HouseReportCard";
+import { SalesReportCard } from "./SalesReportCard";
 import { EggFlowCard } from "./EggFlowCard";
 import { CalendarCheck } from "lucide-react";
 import { formatDate } from "@/lib/utils";
@@ -14,12 +15,12 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; salesFrom?: string; salesTo?: string }>;
 }) {
-  const { from, to } = await searchParams;
+  const { from, to, salesFrom, salesTo } = await searchParams;
   const [session, stats] = await Promise.all([
     getServerSession(authOptions),
-    getCachedDashboardStats({ from, to }),
+    getCachedDashboardStats({ from, to }, { from: salesFrom, to: salesTo }),
   ]);
 
   const isOwner = (session?.user?.role === "OWNER" || session?.user?.role === "DEVELOPER");
@@ -58,6 +59,13 @@ export default async function DashboardPage({
           houseReport={stats.houseReport}
           from={from}
           to={to}
+        />
+
+        {/* Sales report by customer */}
+        <SalesReportCard
+          salesReport={stats.salesReport}
+          from={salesFrom}
+          to={salesTo}
         />
 
         {/* Telur stock flow */}

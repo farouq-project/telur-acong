@@ -180,6 +180,47 @@ export async function getEggSalesByType(params?: { from?: string; to?: string })
   };
 }
 
+export interface CustomerSalesReport {
+  customerName: string;
+  telurBagusKg: number;
+  telurRetakKg: number;
+  telurBuleKg: number;
+  totalJual: number;
+}
+
+export async function getSalesReportByCustomer(params?: { from?: string; to?: string }): Promise<CustomerSalesReport[]> {
+  const { from, to } = params ?? {};
+  const dateFilter = from || to
+    ? {
+        date: {
+          ...(from && { gte: new Date(from) }),
+          ...(to && { lte: new Date(to) }),
+        },
+      }
+    : {};
+
+  const records = await prisma.eggSale.findMany({
+    where: dateFilter,
+    select: { customerName: true, eggType: true, qtySold: true, totalValue: true },
+  });
+
+  const map = new Map<string, CustomerSalesReport>();
+  for (const r of records) {
+    let entry = map.get(r.customerName);
+    if (!entry) {
+      entry = { customerName: r.customerName, telurBagusKg: 0, telurRetakKg: 0, telurBuleKg: 0, totalJual: 0 };
+      map.set(r.customerName, entry);
+    }
+    const qty = decimalToNumber(r.qtySold);
+    if (r.eggType === "TELUR_BAGUS") entry.telurBagusKg += qty;
+    else if (r.eggType === "TELUR_RETAK") entry.telurRetakKg += qty;
+    else if (r.eggType === "TELUR_BULE") entry.telurBuleKg += qty;
+    entry.totalJual += decimalToNumber(r.totalValue);
+  }
+
+  return Array.from(map.values()).sort((a, b) => a.customerName.localeCompare(b.customerName));
+}
+
 export async function getMonthlySales(): Promise<number> {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);

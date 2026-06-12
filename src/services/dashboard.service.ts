@@ -1,11 +1,11 @@
 import { getTodayProduction, getMonthlyProduction, getProductionTrend, getProductionTrendByHouse, getDailyMetrics, getTodayCrackedEggs, getProductionReportByHouse, getEggFlowByDay } from "./production.service";
-import { getTodaySales, getMonthlySales, getSalesTrend, getEggSalesByType } from "./sales.service";
+import { getTodaySales, getMonthlySales, getSalesTrend, getEggSalesByType, getSalesReportByCustomer } from "./sales.service";
 import { getEggStock, getFeedStock } from "./stock.service";
 import { getTodayMortality, getMonthlyMortality, getMortalityTrend } from "./mortality.service";
 import { getUpcomingVaccinations } from "./vaccination.service";
 import { getHouses } from "./house.service";
 
-export async function getDashboardStats(reportRange?: { from?: string; to?: string }) {
+export async function getDashboardStats(reportRange?: { from?: string; to?: string }, salesRange?: { from?: string; to?: string }) {
   const [
     eggStock,
     todayProduction,
@@ -26,6 +26,7 @@ export async function getDashboardStats(reportRange?: { from?: string; to?: stri
     houseReport,
     eggSalesByType,
     eggFlow,
+    salesReport,
   ] = await Promise.all([
     getEggStock(),
     getTodayProduction(),
@@ -46,6 +47,7 @@ export async function getDashboardStats(reportRange?: { from?: string; to?: stri
     getProductionReportByHouse(reportRange),
     getEggSalesByType(reportRange),
     getEggFlowByDay(reportRange),
+    getSalesReportByCustomer(salesRange),
   ]);
 
   const totalTelurBagusKg = houseReport.reduce((sum, h) => sum + h.telurBagusKg, 0);
@@ -77,5 +79,6 @@ export async function getDashboardStats(reportRange?: { from?: string; to?: stri
     stokTelurBagus,
     stokTelurRetak,
     eggFlow,
+    salesReport,
   };
 }
