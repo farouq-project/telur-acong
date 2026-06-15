@@ -22,24 +22,21 @@ export interface FeedStockItem {
 }
 
 export async function getFeedStock(): Promise<FeedStockItem[]> {
-  const products = await prisma.feedProduct.findMany({
-    include: {
-      purchases: { select: { qty: true } },
-      usages: { select: { qtyUsed: true } },
-      sales: { select: { qty: true } },
-    },
-  });
+  const [products, purchases, usages, sales] = await Promise.all([
+    prisma.feedProduct.findMany(),
+    prisma.feedPurchase.groupBy({ by: ["feedProductId"], _sum: { qty: true } }),
+    prisma.feedUsage.groupBy({ by: ["feedProductId"], _sum: { qtyUsed: true } }),
+    prisma.feedSale.groupBy({ by: ["feedProductId"], _sum: { qty: true } }),
+  ]);
+
+  const purchasedByProduct = new Map(purchases.map((p) => [p.feedProductId, decimalToNumber(p._sum.qty)]));
+  const usedByProduct = new Map(usages.map((u) => [u.feedProductId, decimalToNumber(u._sum.qtyUsed)]));
+  const soldByProduct = new Map(sales.map((s) => [s.feedProductId, decimalToNumber(s._sum.qty)]));
 
   return products.map((p) => {
-    const purchased = p.purchases.reduce(
-      (sum, r) => sum + decimalToNumber(r.qty),
-      0
-    );
-    const used = p.usages.reduce(
-      (sum, r) => sum + decimalToNumber(r.qtyUsed),
-      0
-    );
-    const sold = p.sales.reduce((sum, r) => sum + decimalToNumber(r.qty), 0);
+    const purchased = purchasedByProduct.get(p.id) ?? 0;
+    const used = usedByProduct.get(p.id) ?? 0;
+    const sold = soldByProduct.get(p.id) ?? 0;
     return {
       productId: p.id,
       productName: p.name,

@@ -1,8 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { TrendChart } from "@/components/dashboard/TrendChart";
+import dynamic from "next/dynamic";
+import { Skeleton } from "@/components/ui/skeleton";
 import { DailyMetricsTable } from "@/components/dashboard/DailyMetricsTable";
+
+const TrendChart = dynamic(
+  () => import("@/components/dashboard/TrendChart").then((m) => m.TrendChart),
+  { ssr: false, loading: () => <Skeleton className="h-[208px] w-full rounded-xl" /> }
+);
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,

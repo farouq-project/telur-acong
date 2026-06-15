@@ -510,7 +510,12 @@ export interface DailyMetric {
 // - HD  = Total Butir [Bagus + Retak] / Sisa Populasi [Populasi - Kematian] — persentase
 // - FI  = Pakan (kg) / Sisa Populasi [Populasi - Kematian] — rasio desimal
 export async function getDailyMetrics() {
+  const from = new Date();
+  from.setDate(from.getDate() - 180);
+  from.setHours(0, 0, 0, 0);
+
   const records = await prisma.eggProduction.findMany({
+    where: { date: { gte: from } },
     select: {
       id: true,
       date: true,

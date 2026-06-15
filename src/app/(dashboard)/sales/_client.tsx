@@ -328,7 +328,14 @@ export default function SalesClient({ initialData }: Props) {
     }
   }, [search, dateFrom, dateTo, hasActiveFilter, pageSize]);
 
+  const isFirstFetch = useRef(true);
   useEffect(() => {
+    // initialData from SSR already matches the default filters/pageSize, so
+    // skip the redundant refetch on first mount.
+    if (isFirstFetch.current) {
+      isFirstFetch.current = false;
+      return;
+    }
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, dateFrom, dateTo, pageSize]);

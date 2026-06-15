@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import * as XLSX from "xlsx";
+import type { WorkBook } from "xlsx";
 import {
   Plus, Search, Edit2, Trash2, Loader2, X, FileSpreadsheet, Download, Upload, ListFilter,
   ArrowUpDown, ArrowUp, ArrowDown, ListChecks, CheckSquare, Square,
@@ -45,7 +45,8 @@ const IMPORT_COLUMNS = [
   { key: "notes", header: "Catatan" },
 ] as const;
 
-function downloadProductionTemplate(feedProducts: FeedProduct[]) {
+async function downloadProductionTemplate(feedProducts: FeedProduct[]) {
+  const XLSX = await import("xlsx");
   const headers = IMPORT_COLUMNS.map((c) => c.header);
   const sampleFeedProduct = feedProducts[0]?.name ?? "Konsentrat A";
   const sample = ["2026-06-01", "Kandang A", 950, 20, 56.5, 1.1, 120, sampleFeedProduct, 5000, 2, "Contoh baris — silakan hapus sebelum import"];
@@ -99,9 +100,9 @@ interface ImportResult {
   errors: ImportError[];
 }
 
-function parseImportWorkbook(workbook: XLSX.WorkBook, feedProducts: FeedProduct[]): ImportResult {
+function parseImportWorkbook(xlsx: typeof import("xlsx"), workbook: WorkBook, feedProducts: FeedProduct[]): ImportResult {
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const raw: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+  const raw: Record<string, unknown>[] = xlsx.utils.sheet_to_json(sheet, { defval: "" });
   const headerToKey = new Map(IMPORT_COLUMNS.map((c) => [c.header.trim().toLowerCase(), c.key]));
 
   const rows: ImportRow[] = [];
@@ -375,7 +376,14 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
     }
   }, [search, filterHouses, dateFrom, dateTo, hasActiveFilter, pageSize]);
 
+  const isFirstFetch = useRef(true);
   useEffect(() => {
+    // initialData from SSR already matches the default filters/pageSize, so
+    // skip the redundant refetch on first mount.
+    if (isFirstFetch.current) {
+      isFirstFetch.current = false;
+      return;
+    }
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, filterHouses, dateFrom, dateTo, pageSize]);
@@ -534,8 +542,9 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
     if (!file) return;
     try {
       const buf = await file.arrayBuffer();
+      const XLSX = await import("xlsx");
       const workbook = XLSX.read(buf, { type: "array", cellDates: true });
-      const result = parseImportWorkbook(workbook, feedProducts);
+      const result = parseImportWorkbook(XLSX, workbook, feedProducts);
       if (result.rows.length === 0 && result.errors.length === 0) {
         toast({ variant: "destructive", title: "File kosong", description: "Tidak ada data yang ditemukan dalam file" });
         return;

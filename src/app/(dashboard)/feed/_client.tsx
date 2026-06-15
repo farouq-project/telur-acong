@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -352,7 +352,14 @@ export default function FeedClient({ initialProducts, initialPurchases, initialU
     }
   }, [dateFrom, dateTo, pageSize]);
 
+  const isFirstFetch = useRef(true);
   useEffect(() => {
+    // initialData from SSR already matches the default filters/pageSize, so
+    // skip the redundant refetch on first mount.
+    if (isFirstFetch.current) {
+      isFirstFetch.current = false;
+      return;
+    }
     fetchAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFrom, dateTo, pageSize]);
