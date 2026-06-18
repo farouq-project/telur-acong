@@ -8,12 +8,13 @@ import { Input } from "@/components/ui/input";
 import { formatNumber, todayISO } from "@/lib/utils";
 import type { HouseReport } from "@/services/production.service";
 
-type SortCol = "house" | "populasi" | "mati" | "pakanKg" | "telurBagusKg" | "telurRetakKg";
+type SortCol = "house" | "populasi" | "mati" | "umurAyam" | "pakanKg" | "telurBagusKg" | "telurRetakKg";
 
 const COLS: { key: SortCol; label: string; align?: "right" }[] = [
   { key: "house", label: "Kandang" },
   { key: "populasi", label: "Populasi", align: "right" },
   { key: "mati", label: "Mati", align: "right" },
+  { key: "umurAyam", label: "Umur (mgg)", align: "right" },
   { key: "pakanKg", label: "Pakan (kg)", align: "right" },
   { key: "telurBagusKg", label: "Telur Bagus (kg)", align: "right" },
   { key: "telurRetakKg", label: "Telur Retak (kg)", align: "right" },
@@ -164,6 +165,7 @@ export function HouseReportCard({
                   <td className="px-2 py-1.5 font-medium text-gray-800">{h.house}</td>
                   <td className="px-2 py-1.5 text-right">{h.populasi != null ? formatNumber(h.populasi) : "-"}</td>
                   <td className="px-2 py-1.5 text-right">{formatNumber(h.mati)}</td>
+                  <td className="px-2 py-1.5 text-right">{h.umurAyam != null ? h.umurAyam : <span className="text-gray-300">—</span>}</td>
                   <td className="px-2 py-1.5 text-right">{formatNumber(h.pakanKg)}</td>
                   <td className="px-2 py-1.5 text-right">{formatNumber(h.telurBagusKg)}</td>
                   <td className="px-2 py-1.5 text-right">{formatNumber(h.telurRetakKg)}</td>
@@ -179,6 +181,7 @@ export function HouseReportCard({
                 <td className="px-2 py-1.5 text-right">
                   {formatNumber(houseReport.reduce((sum, h) => sum + h.mati, 0))}
                 </td>
+                <td className="px-2 py-1.5 text-right text-gray-300">—</td>
                 <td className="px-2 py-1.5 text-right">
                   {formatNumber(houseReport.reduce((sum, h) => sum + h.pakanKg, 0))}
                 </td>

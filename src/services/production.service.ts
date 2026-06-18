@@ -374,6 +374,7 @@ export interface HouseReport {
   pakanKg: number;
   telurBagusKg: number;
   telurRetakKg: number;
+  umurAyam: number | null;
 }
 
 // Ringkasan per kandang untuk dashboard: Populasi diambil dari catatan terakhir
@@ -399,6 +400,7 @@ export async function getProductionReportByHouse(params?: { from?: string; to?: 
       feedQtyKg: true,
       goodEggsKg: true,
       crackedEggsKg: true,
+      umurAyam: true,
     },
     orderBy: [{ date: "asc" }, { createdAt: "asc" }],
   });
@@ -407,7 +409,7 @@ export async function getProductionReportByHouse(params?: { from?: string; to?: 
   for (const r of records) {
     let entry = map.get(r.house);
     if (!entry) {
-      entry = { house: r.house, populasi: null, mati: 0, pakanKg: 0, telurBagusKg: 0, telurRetakKg: 0 };
+      entry = { house: r.house, populasi: null, mati: 0, pakanKg: 0, telurBagusKg: 0, telurRetakKg: 0, umurAyam: null };
       map.set(r.house, entry);
     }
     entry.mati += r.mortality ?? 0;
@@ -415,6 +417,7 @@ export async function getProductionReportByHouse(params?: { from?: string; to?: 
     entry.telurBagusKg += decimalToNumber(r.goodEggsKg);
     entry.telurRetakKg += decimalToNumber(r.crackedEggsKg);
     if (r.populasi != null) entry.populasi = r.populasi;
+    if (r.umurAyam != null) entry.umurAyam = r.umurAyam;
   }
 
   return Array.from(map.values()).sort((a, b) => a.house.localeCompare(b.house));
