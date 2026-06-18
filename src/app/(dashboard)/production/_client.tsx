@@ -421,8 +421,14 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
     mortality: "" as const, umurAyam: "" as const, notes: "",
   };
 
+  // Tracks the last value written by the umurAyam auto-fill effect so we can
+  // tell whether a subsequent change to the field was manual (user typed) or
+  // still the auto-filled recommendation.
+  const umurAutoFilled = useRef<number | "">("");
+
   function openCreate() {
     form.reset(defaultValues);
+    umurAutoFilled.current = "";
     setEditingId(null);
     setIsSheetOpen(true);
   }
@@ -634,7 +640,9 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedHouse, watchedMortality, editingId, records, houses]);
 
-  // Auto-isi Umur Ayam = umur ayam catatan sebelumnya + selisih minggu (1 minggu = 7 hari)
+  // Auto-isi Umur Ayam = umur ayam catatan sebelumnya + selisih minggu (1 minggu = 7 hari).
+  // Only fills when the field is empty or still holds the last auto-suggested value,
+  // so a manual edit by the user is never overwritten.
   useEffect(() => {
     if (editingId) return;
     if (!watchedHouse || !watchedDate) return;
@@ -648,7 +656,13 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
         (new Date(watchedDate).getTime() - new Date(previousRecord.date).getTime()) / 86400000
       );
       const weeksDiff = Math.floor(daysDiff / 7);
-      form.setValue("umurAyam", Math.max(0, previousRecord.umurAyam + weeksDiff));
+      const suggested = Math.max(0, previousRecord.umurAyam + weeksDiff);
+      const current = form.getValues("umurAyam");
+      // Only write if the field is empty or still equals the last auto-fill value.
+      if (current === "" || current === umurAutoFilled.current) {
+        form.setValue("umurAyam", suggested);
+        umurAutoFilled.current = suggested;
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedHouse, watchedDate, editingId, records]);
