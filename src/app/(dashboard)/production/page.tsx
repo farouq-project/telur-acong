@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ProductionPage() {
   const [{ data }, houses, rawFeedProducts] = await Promise.all([
-    getProductions({ limit: 50 }),
+    getProductions({ limit: 5000 }),
     getHouses(),
     getFeedProducts(),
   ]);

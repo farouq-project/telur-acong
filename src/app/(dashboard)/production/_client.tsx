@@ -305,14 +305,10 @@ function ProductionTable({
                 <td className="px-2 py-1.5 text-right font-mono">{r.populasi != null ? formatNumber(r.populasi) : <span className="text-gray-300">—</span>}</td>
                 <td className="px-2 py-1.5 text-right font-mono text-red-500">{r.mortality != null && r.mortality > 0 ? r.mortality : <span className="text-gray-300">—</span>}</td>
                 <td className="px-2 py-1.5 text-right font-mono text-gray-600">
-                  {r.umurAyam != null
-                    ? r.umurAyam
-                    : (() => {
-                        const s = computeUmurSuggestion(r, allRecords);
-                        return s != null
-                          ? <span className="text-gray-300 italic" title="Estimasi — klik Edit untuk menyimpan">~{s}</span>
-                          : <span className="text-gray-300">—</span>;
-                      })()}
+                  {(() => {
+                    const v = r.umurAyam ?? computeUmurSuggestion(r, allRecords);
+                    return v != null ? v : <span className="text-gray-300">—</span>;
+                  })()}
                 </td>
                 <td className="px-2 py-1.5 text-right font-mono text-blue-600">{hd !== null ? hd.toFixed(1) : <span className="text-gray-300">—</span>}</td>
                 <td className="px-2 py-1.5 text-right font-mono text-amber-700">{feedIntake !== null ? feedIntake.toFixed(3) : <span className="text-gray-300">—</span>}</td>
@@ -370,7 +366,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
-  const [pageSize, setPageSize] = useState<"50" | "100" | "200" | "all">("50");
+  const [pageSize, setPageSize] = useState<"50" | "100" | "200" | "all">("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function toggleFilterHouse(name: string) {
