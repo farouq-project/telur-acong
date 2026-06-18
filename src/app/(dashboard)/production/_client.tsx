@@ -179,6 +179,28 @@ interface Props {
   feedProducts: FeedProduct[];
 }
 
+// Given any record with null umurAyam, find the nearest anchor record for the
+// same kandang that *does* have umurAyam set, then extrapolate by week diff.
+function computeUmurSuggestion(record: EggProduction, allRecords: EggProduction[]): number | null {
+  const anchors = allRecords.filter(
+    (r) => r.id !== record.id &&
+      r.house.trim().toLowerCase() === record.house.trim().toLowerCase() &&
+      r.umurAyam != null
+  );
+  if (anchors.length === 0) return null;
+
+  const recordMs = new Date(record.date).getTime();
+  const anchor = anchors.reduce((best, r) => {
+    const d = Math.abs(new Date(r.date).getTime() - recordMs);
+    const bd = Math.abs(new Date(best.date).getTime() - recordMs);
+    return d < bd ? r : best;
+  });
+
+  const daysDiff = Math.round((recordMs - new Date(anchor.date).getTime()) / 86400000);
+  const weeksDiff = Math.floor(daysDiff / 7);
+  return Math.max(0, anchor.umurAyam! + weeksDiff);
+}
+
 function computeMetrics(r: EggProduction) {
   const totalEggs = r.goodEggs + r.crackedEggs;
   const totalEggsKg = (r.goodEggsKg ?? 0) + (r.crackedEggsKg ?? 0);
@@ -216,10 +238,11 @@ function SortIcon({ col, sortCol, sortDir }: { col: string; sortCol: string; sor
 }
 
 function ProductionTable({
-  records, sortCol, sortDir, selectMode, selectedIds, isOwner,
+  records, allRecords, sortCol, sortDir, selectMode, selectedIds, isOwner,
   onSort, onToggleSelected, onEdit, onDelete,
 }: {
   records: EggProduction[];
+  allRecords: EggProduction[];
   sortCol: string;
   sortDir: "asc" | "desc";
   selectMode: boolean;
@@ -281,7 +304,16 @@ function ProductionTable({
                 <td className="px-2 py-1.5 text-right font-mono text-amber-600">{r.feedQtyKg != null ? r.feedQtyKg : <span className="text-gray-300">—</span>}</td>
                 <td className="px-2 py-1.5 text-right font-mono">{r.populasi != null ? formatNumber(r.populasi) : <span className="text-gray-300">—</span>}</td>
                 <td className="px-2 py-1.5 text-right font-mono text-red-500">{r.mortality != null && r.mortality > 0 ? r.mortality : <span className="text-gray-300">—</span>}</td>
-                <td className="px-2 py-1.5 text-right font-mono text-gray-600">{r.umurAyam != null ? r.umurAyam : <span className="text-gray-300">—</span>}</td>
+                <td className="px-2 py-1.5 text-right font-mono text-gray-600">
+                  {r.umurAyam != null
+                    ? r.umurAyam
+                    : (() => {
+                        const s = computeUmurSuggestion(r, allRecords);
+                        return s != null
+                          ? <span className="text-gray-300 italic" title="Estimasi — klik Edit untuk menyimpan">~{s}</span>
+                          : <span className="text-gray-300">—</span>;
+                      })()}
+                </td>
                 <td className="px-2 py-1.5 text-right font-mono text-blue-600">{hd !== null ? hd.toFixed(1) : <span className="text-gray-300">—</span>}</td>
                 <td className="px-2 py-1.5 text-right font-mono text-amber-700">{feedIntake !== null ? feedIntake.toFixed(3) : <span className="text-gray-300">—</span>}</td>
                 <td className="px-2 py-1.5 text-right font-mono text-purple-600">{fcr !== null ? fcr.toFixed(3) : <span className="text-gray-300">—</span>}</td>
@@ -434,6 +466,8 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
   }
 
   function openEdit(record: EggProduction) {
+    const umurValue = record.umurAyam ?? computeUmurSuggestion(record, records) ?? "";
+    umurAutoFilled.current = umurValue === "" ? "" : (umurValue as number);
     form.reset({
       date: record.date.split("T")[0],
       house: record.house,
@@ -445,7 +479,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
       feedQtyKg: record.feedQtyKg ?? "",
       feedProductId: record.feedProductId ?? "",
       mortality: record.mortality ?? "",
-      umurAyam: record.umurAyam ?? "",
+      umurAyam: umurValue,
       notes: record.notes ?? "",
     });
     setEditingId(record.id);
@@ -826,6 +860,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
         ) : (
           <ProductionTable
             records={displayRecords}
+            allRecords={records}
             sortCol={sortCol}
             sortDir={sortDir}
             selectMode={selectMode}
