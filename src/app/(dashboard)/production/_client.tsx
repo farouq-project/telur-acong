@@ -45,6 +45,52 @@ const IMPORT_COLUMNS = [
   { key: "notes", header: "Catatan" },
 ] as const;
 
+async function exportProductionData(records: EggProduction[], allRecords: EggProduction[]) {
+  const XLSX = await import("xlsx");
+  const { format: fmtDate, parseISO } = await import("date-fns");
+
+  const headers = [
+    "Tanggal", "Hari", "Kandang",
+    "Telur Bagus (btr)", "Telur Retak (btr)",
+    "Telur Bagus (kg)", "Telur Retak (kg)",
+    "Pakan (kg)", "Populasi", "Kematian", "Umur (mgg)",
+    "HD (%)", "FI", "FCR",
+    "Catatan",
+  ];
+
+  const rows = records.map((r) => {
+    const { hd, feedIntake, fcr } = computeMetrics(r);
+    const umur = r.umurAyam ?? computeUmurSuggestion(r, allRecords);
+    const dayName = (() => {
+      try { return fmtDate(parseISO(r.date), "EEEE"); } catch { return ""; }
+    })();
+    return [
+      r.date.split("T")[0],
+      dayName,
+      r.house,
+      r.goodEggs,
+      r.crackedEggs,
+      r.goodEggsKg ?? "",
+      r.crackedEggsKg ?? "",
+      r.feedQtyKg ?? "",
+      r.populasi ?? "",
+      r.mortality ?? "",
+      umur ?? "",
+      hd != null ? Math.round(hd * 100) / 100 : "",
+      feedIntake != null ? Math.round(feedIntake * 1000) / 1000 : "",
+      fcr != null ? Math.round(fcr * 1000) / 1000 : "",
+      r.notes ?? "",
+    ];
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws["!cols"] = headers.map(() => ({ wch: 16 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Produksi");
+  const filename = `laporan-produksi-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  XLSX.writeFile(wb, filename);
+}
+
 async function downloadProductionTemplate(feedProducts: FeedProduct[]) {
   const XLSX = await import("xlsx");
   const headers = IMPORT_COLUMNS.map((c) => c.header);
@@ -723,6 +769,11 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {isOwner && (
+                <DropdownMenuItem onClick={() => exportProductionData(displayRecords, records)}>
+                  <Download className="w-4 h-4 mr-2" /> Export Excel
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => downloadProductionTemplate(feedProducts)}>
                 <Download className="w-4 h-4 mr-2" /> Unduh Template Excel
               </DropdownMenuItem>
