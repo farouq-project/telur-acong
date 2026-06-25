@@ -174,8 +174,8 @@ export function HouseReportCard({
                   <td className="px-2 py-1.5 text-right">{formatNumber(h.pakanKg)}</td>
                   <td className="px-2 py-1.5 text-right">{formatNumber(h.telurBagusKg)}</td>
                   <td className="px-2 py-1.5 text-right">{formatNumber(h.telurRetakKg)}</td>
-                  <td className="px-2 py-1.5 text-right font-mono text-green-700 font-semibold">{formatNumber(h.butirBagus)}</td>
-                  <td className="px-2 py-1.5 text-right font-mono text-yellow-600">{h.butirRetak > 0 ? formatNumber(h.butirRetak) : <span className="text-gray-300">—</span>}</td>
+                  <td className="px-2 py-1.5 text-right font-mono text-green-700 font-semibold">{formatNumber(h.butirBagus ?? 0)}</td>
+                  <td className="px-2 py-1.5 text-right font-mono text-yellow-600">{(h.butirRetak ?? 0) > 0 ? formatNumber(h.butirRetak) : <span className="text-gray-300">—</span>}</td>
                   <td className="px-2 py-1.5 text-right font-mono text-purple-600">{h.fcr != null ? h.fcr.toFixed(3) : <span className="text-gray-300">—</span>}</td>
                   <td className="px-2 py-1.5 text-right font-mono text-blue-600">{h.hd != null ? h.hd.toFixed(1) : <span className="text-gray-300">—</span>}</td>
                   <td className="px-2 py-1.5 text-right font-mono text-amber-700">{h.feedIntake != null ? h.feedIntake.toFixed(3) : <span className="text-gray-300">—</span>}</td>
@@ -202,10 +202,10 @@ export function HouseReportCard({
                   {formatNumber(houseReport.reduce((sum, h) => sum + h.telurRetakKg, 0))}
                 </td>
                 <td className="px-2 py-1.5 text-right font-semibold">
-                  {formatNumber(houseReport.reduce((sum, h) => sum + h.butirBagus, 0))}
+                  {formatNumber(houseReport.reduce((sum, h) => sum + (h.butirBagus ?? 0), 0))}
                 </td>
                 <td className="px-2 py-1.5 text-right font-semibold">
-                  {formatNumber(houseReport.reduce((sum, h) => sum + h.butirRetak, 0))}
+                  {formatNumber(houseReport.reduce((sum, h) => sum + (h.butirRetak ?? 0), 0))}
                 </td>
                 <td className="px-2 py-1.5 text-right text-gray-300">—</td>
                 <td className="px-2 py-1.5 text-right text-gray-300">—</td>

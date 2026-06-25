@@ -4,7 +4,7 @@ import { getEggStock } from "@/services/stock.service";
 
 export const getCachedDashboardStats = unstable_cache(
   getDashboardStats,
-  ["dashboard-stats"],
+  ["dashboard-stats-v3"],
   { revalidate: 30 }
 );
 
