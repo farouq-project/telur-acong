@@ -372,6 +372,8 @@ export interface HouseReport {
   populasi: number | null;
   mati: number;
   pakanKg: number;
+  butirBagus: number;
+  butirRetak: number;
   telurBagusKg: number;
   telurRetakKg: number;
   umurAyam: number | null;
@@ -400,6 +402,8 @@ export async function getProductionReportByHouse(params?: { from?: string; to?: 
       date: true,
       populasi: true,
       mortality: true,
+      goodEggs: true,
+      crackedEggs: true,
       feedQtyKg: true,
       goodEggsKg: true,
       crackedEggsKg: true,
@@ -412,10 +416,12 @@ export async function getProductionReportByHouse(params?: { from?: string; to?: 
   for (const r of records) {
     let entry = map.get(r.house);
     if (!entry) {
-      entry = { house: r.house, populasi: null, mati: 0, pakanKg: 0, telurBagusKg: 0, telurRetakKg: 0, umurAyam: null, fcr: null, hd: null, feedIntake: null };
+      entry = { house: r.house, populasi: null, mati: 0, butirBagus: 0, butirRetak: 0, pakanKg: 0, telurBagusKg: 0, telurRetakKg: 0, umurAyam: null, fcr: null, hd: null, feedIntake: null };
       map.set(r.house, entry);
     }
     entry.mati += r.mortality ?? 0;
+    entry.butirBagus += r.goodEggs;
+    entry.butirRetak += r.crackedEggs;
     entry.pakanKg += decimalToNumber(r.feedQtyKg);
     entry.telurBagusKg += decimalToNumber(r.goodEggsKg);
     entry.telurRetakKg += decimalToNumber(r.crackedEggsKg);
