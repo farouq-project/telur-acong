@@ -400,8 +400,6 @@ export async function getProductionReportByHouse(params?: { from?: string; to?: 
       date: true,
       populasi: true,
       mortality: true,
-      goodEggs: true,
-      crackedEggs: true,
       feedQtyKg: true,
       goodEggsKg: true,
       crackedEggsKg: true,
@@ -410,16 +408,12 @@ export async function getProductionReportByHouse(params?: { from?: string; to?: 
     orderBy: [{ date: "asc" }, { createdAt: "asc" }],
   });
 
-  // Accumulators for computing per-house averages of FCR, HD, FI.
-  const metricAcc = new Map<string, { fcr: number[]; hd: number[]; fi: number[] }>();
   const map = new Map<string, HouseReport>();
-
   for (const r of records) {
     let entry = map.get(r.house);
     if (!entry) {
       entry = { house: r.house, populasi: null, mati: 0, pakanKg: 0, telurBagusKg: 0, telurRetakKg: 0, umurAyam: null, fcr: null, hd: null, feedIntake: null };
       map.set(r.house, entry);
-      metricAcc.set(r.house, { fcr: [], hd: [], fi: [] });
     }
     entry.mati += r.mortality ?? 0;
     entry.pakanKg += decimalToNumber(r.feedQtyKg);
@@ -427,25 +421,6 @@ export async function getProductionReportByHouse(params?: { from?: string; to?: 
     entry.telurRetakKg += decimalToNumber(r.crackedEggsKg);
     if (r.populasi != null) entry.populasi = r.populasi;
     if (r.umurAyam != null) entry.umurAyam = r.umurAyam;
-
-    const acc = metricAcc.get(r.house)!;
-    const feedKg = decimalToNumber(r.feedQtyKg);
-    const eggsKg = decimalToNumber(r.goodEggsKg) + decimalToNumber(r.crackedEggsKg);
-    const totalEggs = r.goodEggs + r.crackedEggs;
-    const sisaPop = r.populasi != null ? r.populasi - (r.mortality ?? 0) : null;
-
-    if (feedKg > 0 && eggsKg > 0) acc.fcr.push(feedKg / eggsKg);
-    if (sisaPop != null && sisaPop > 0) acc.hd.push((totalEggs / sisaPop) * 100);
-    if (feedKg > 0 && sisaPop != null && sisaPop > 0) acc.fi.push(feedKg / sisaPop);
-  }
-
-  const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((s, v) => s + v, 0) / arr.length : null;
-
-  for (const [house, entry] of map) {
-    const acc = metricAcc.get(house)!;
-    entry.fcr = avg(acc.fcr) != null ? Math.round(avg(acc.fcr)! * 1000) / 1000 : null;
-    entry.hd = avg(acc.hd) != null ? Math.round(avg(acc.hd)! * 100) / 100 : null;
-    entry.feedIntake = avg(acc.fi) != null ? Math.round(avg(acc.fi)! * 1000) / 1000 : null;
   }
 
   return Array.from(map.values()).sort((a, b) => a.house.localeCompare(b.house));
@@ -540,13 +515,22 @@ export interface DailyMetric {
 // - FCR = Pakan (kg) / Total Produksi Telur (kg) [Bagus + Retak] — rasio desimal
 // - HD  = Total Butir [Bagus + Retak] / Sisa Populasi [Populasi - Kematian] — persentase
 // - FI  = Pakan (kg) / Sisa Populasi [Populasi - Kematian] — rasio desimal
-export async function getDailyMetrics() {
-  const from = new Date();
-  from.setDate(from.getDate() - 180);
-  from.setHours(0, 0, 0, 0);
+export async function getDailyMetrics(params?: { from?: string; to?: string }) {
+  let dateFilter: Record<string, Date>;
+  if (params?.from || params?.to) {
+    dateFilter = {
+      ...(params.from && { gte: new Date(params.from) }),
+      ...(params.to && { lte: new Date(params.to) }),
+    };
+  } else {
+    const from = new Date();
+    from.setDate(from.getDate() - 180);
+    from.setHours(0, 0, 0, 0);
+    dateFilter = { gte: from };
+  }
 
   const records = await prisma.eggProduction.findMany({
-    where: { date: { gte: from } },
+    where: { date: dateFilter },
     select: {
       id: true,
       date: true,

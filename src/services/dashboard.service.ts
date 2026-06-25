@@ -41,7 +41,7 @@ export async function getDashboardStats(reportRange?: { from?: string; to?: stri
     getSalesTrend(30),
     getMortalityTrend(30),
     getFeedStock(),
-    getDailyMetrics(),
+    getDailyMetrics(reportRange),
     getHouses(),
     getTodayCrackedEggs(),
     getProductionReportByHouse(reportRange),
@@ -50,8 +50,25 @@ export async function getDashboardStats(reportRange?: { from?: string; to?: stri
     getSalesReportByCustomer(salesRange),
   ]);
 
-  const totalTelurBagusKg = houseReport.reduce((sum, h) => sum + h.telurBagusKg, 0);
-  const totalTelurRetakKg = houseReport.reduce((sum, h) => sum + h.telurRetakKg, 0);
+  // Compute per-house metric averages from dailyMetrics (same date range, proven computation).
+  const metricAcc = new Map<string, { fcr: number[]; hd: number[]; fi: number[] }>();
+  for (const m of dailyMetrics) {
+    if (!metricAcc.has(m.house)) metricAcc.set(m.house, { fcr: [], hd: [], fi: [] });
+    const acc = metricAcc.get(m.house)!;
+    if (m.fcr != null) acc.fcr.push(m.fcr);
+    if (m.hd != null) acc.hd.push(m.hd);
+    if (m.feedIntake != null) acc.fi.push(m.feedIntake);
+  }
+  const avgOf = (arr: number[], decimals: number) =>
+    arr.length > 0 ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length * 10 ** decimals) / 10 ** decimals : null;
+
+  const enrichedHouseReport = houseReport.map((h) => {
+    const m = metricAcc.get(h.house) ?? { fcr: [], hd: [], fi: [] };
+    return { ...h, fcr: avgOf(m.fcr, 3), hd: avgOf(m.hd, 2), feedIntake: avgOf(m.fi, 3) };
+  });
+
+  const totalTelurBagusKg = enrichedHouseReport.reduce((sum, h) => sum + h.telurBagusKg, 0);
+  const totalTelurRetakKg = enrichedHouseReport.reduce((sum, h) => sum + h.telurRetakKg, 0);
 
   const stokTelurBagus = Math.max(0, totalTelurBagusKg - eggSalesByType.telurBagusKg);
   const stokTelurRetak = Math.max(0, totalTelurRetakKg - eggSalesByType.telurRetakKg);
@@ -73,7 +90,7 @@ export async function getDashboardStats(reportRange?: { from?: string; to?: stri
     dailyMetrics,
     todayCrackedEggs,
     houseNames: houses.map((h) => h.name),
-    houseReport,
+    houseReport: enrichedHouseReport,
     jualBagusKg: eggSalesByType.telurBagusKg,
     jualRetakKg: eggSalesByType.telurRetakKg,
     stokTelurBagus,
