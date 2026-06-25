@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { formatNumber, todayISO } from "@/lib/utils";
 import type { HouseReport } from "@/services/production.service";
 
-type SortCol = "house" | "populasi" | "mati" | "umurAyam" | "pakanKg" | "telurBagusKg" | "telurRetakKg";
+type SortCol = "house" | "populasi" | "mati" | "umurAyam" | "pakanKg" | "telurBagusKg" | "telurRetakKg" | "fcr" | "hd" | "feedIntake";
 
 const COLS: { key: SortCol; label: string; align?: "right" }[] = [
   { key: "house", label: "Kandang" },
@@ -18,6 +18,9 @@ const COLS: { key: SortCol; label: string; align?: "right" }[] = [
   { key: "pakanKg", label: "Pakan (kg)", align: "right" },
   { key: "telurBagusKg", label: "Telur Bagus (kg)", align: "right" },
   { key: "telurRetakKg", label: "Telur Retak (kg)", align: "right" },
+  { key: "fcr", label: "FCR (avg)", align: "right" },
+  { key: "hd", label: "HD % (avg)", align: "right" },
+  { key: "feedIntake", label: "FI (avg)", align: "right" },
 ];
 
 function SortIcon({ col, sortCol, sortDir }: { col: string; sortCol: string; sortDir: "asc" | "desc" }) {
@@ -169,6 +172,9 @@ export function HouseReportCard({
                   <td className="px-2 py-1.5 text-right">{formatNumber(h.pakanKg)}</td>
                   <td className="px-2 py-1.5 text-right">{formatNumber(h.telurBagusKg)}</td>
                   <td className="px-2 py-1.5 text-right">{formatNumber(h.telurRetakKg)}</td>
+                  <td className="px-2 py-1.5 text-right font-mono text-purple-600">{h.fcr != null ? h.fcr.toFixed(3) : <span className="text-gray-300">—</span>}</td>
+                  <td className="px-2 py-1.5 text-right font-mono text-blue-600">{h.hd != null ? h.hd.toFixed(1) : <span className="text-gray-300">—</span>}</td>
+                  <td className="px-2 py-1.5 text-right font-mono text-amber-700">{h.feedIntake != null ? h.feedIntake.toFixed(3) : <span className="text-gray-300">—</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -191,6 +197,9 @@ export function HouseReportCard({
                 <td className="px-2 py-1.5 text-right">
                   {formatNumber(houseReport.reduce((sum, h) => sum + h.telurRetakKg, 0))}
                 </td>
+                <td className="px-2 py-1.5 text-right text-gray-300">—</td>
+                <td className="px-2 py-1.5 text-right text-gray-300">—</td>
+                <td className="px-2 py-1.5 text-right text-gray-300">—</td>
               </tr>
             </tfoot>
           </table>
