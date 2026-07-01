@@ -59,9 +59,9 @@ export default function LoginPage() {
           <div className="w-16 h-16 bg-green-600 rounded-2xl flex items-center justify-center mb-4">
             <Egg className="w-9 h-9 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Telur Acong</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Hontalin</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Sistem Manajemen Peternakan
+            Layer Farm Management
           </p>
         </div>
 

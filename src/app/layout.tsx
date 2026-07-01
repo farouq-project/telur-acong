@@ -8,13 +8,13 @@ import { RegisterSW } from "@/components/RegisterSW";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Telur Acong - Sistem Manajemen Peternakan Ayam",
+  title: "Hontalin - Layer Farm",
   description: "Sistem manajemen peternakan ayam layer modern",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Telur Acong",
+    title: "Hontalin",
   },
 };
 
