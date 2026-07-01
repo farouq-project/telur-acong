@@ -10,7 +10,10 @@ type PwaWindow = typeof window & {
 // Also catch events that fire after React hydrates
 if (typeof window !== "undefined") {
   window.addEventListener("beforeinstallprompt", (e) => {
-    e.preventDefault();
+    // Do NOT call e.preventDefault() — that suppresses Chrome's native install
+    // infobar. Without preventDefault, Chrome shows its own banner automatically
+    // AND we can still store the event. prompt.prompt() works in Chrome 76+
+    // regardless of whether preventDefault was called.
     (window as PwaWindow).__pwa_prompt = e as BeforeInstallPromptEvent;
     window.dispatchEvent(new CustomEvent("pwa-installable"));
   });

@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Download, X, Share } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
 import { getInstallPrompt, clearInstallPrompt, isIosSafari } from "@/lib/pwa";
 
 function shouldShow(): boolean {
@@ -16,7 +15,6 @@ function shouldShow(): boolean {
 export function PWAInstallButton() {
   const [visible, setVisible] = useState(false);
   const [showIos, setShowIos] = useState(false);
-  const { toast } = useToast();
 
   useEffect(() => {
     setVisible(shouldShow());
@@ -31,44 +29,26 @@ export function PWAInstallButton() {
   }, []);
 
   async function handleClick() {
-    // iOS Safari: no beforeinstallprompt API, must use Share sheet
     if (isIosSafari()) {
       setShowIos((v) => !v);
       return;
     }
 
     const prompt = getInstallPrompt();
-
     if (prompt) {
-      // Native Chrome install dialog
-      await prompt.prompt();
-      const { outcome } = await prompt.userChoice;
-      if (outcome === "accepted") {
-        clearInstallPrompt();
-        setVisible(false);
+      try {
+        await prompt.prompt();
+        const { outcome } = await prompt.userChoice;
+        if (outcome === "accepted") {
+          clearInstallPrompt();
+          setVisible(false);
+        }
+      } catch {
+        // prompt() rejected (requires user gesture or Chrome not ready) — ignore
       }
-      return;
     }
-
-    // Chrome hasn't approved install yet.
-    // Reload once so Chrome re-evaluates the updated service worker.
-    if (!sessionStorage.getItem("__pwa_reload")) {
-      sessionStorage.setItem("__pwa_reload", "1");
-      toast({
-        title: "Menyiapkan instalasi…",
-        description: "Halaman akan dimuat ulang sebentar.",
-        duration: 2000,
-      });
-      setTimeout(() => window.location.reload(), 500);
-      return;
-    }
-
-    // Already reloaded — Chrome still not ready (engagement/cooldown period).
-    toast({
-      title: "Chrome belum siap",
-      description: "Buka aplikasi beberapa kali lagi, lalu tap tombol ini.",
-      duration: 4000,
-    });
+    // If no prompt: Chrome's own install banner will appear at the bottom
+    // of the screen automatically once Chrome approves this site.
   }
 
   if (!visible) return null;
