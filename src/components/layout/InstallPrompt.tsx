@@ -3,69 +3,53 @@
 import { useEffect, useState } from "react";
 import { Download, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt(): Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-}
+import { getInstallPrompt, clearInstallPrompt, isAppInstalled, isIosSafari } from "@/lib/pwa";
 
 export function InstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [show, setShow] = useState(false);
-  const [isIos, setIsIos] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(false);
+  const [ios, setIos] = useState(false);
 
   useEffect(() => {
-    // Check if already installed (standalone mode)
-    if (window.matchMedia("(display-mode: standalone)").matches) {
-      setIsInstalled(true);
-      return;
-    }
+    if (isAppInstalled()) return;
 
-    // iOS detection
-    const ua = navigator.userAgent;
-    const ios = /iphone|ipad|ipod/i.test(ua);
-    const safari = /safari/i.test(ua) && !/chrome/i.test(ua);
-    if (ios && safari) {
-      const dismissed = localStorage.getItem("pwa-ios-dismissed");
-      if (!dismissed) {
-        setIsIos(true);
+    if (isIosSafari()) {
+      if (!localStorage.getItem("pwa-ios-dismissed")) {
+        setIos(true);
         setShow(true);
       }
       return;
     }
 
-    // Android / Chrome
-    const handler = (e: Event) => {
-      e.preventDefault();
-      const dismissed = localStorage.getItem("pwa-dismissed");
-      if (!dismissed) {
-        setDeferredPrompt(e as BeforeInstallPromptEvent);
-        setShow(true);
-      }
+    // Already captured before component mounted
+    if (getInstallPrompt()) {
+      if (!localStorage.getItem("pwa-dismissed")) setShow(true);
+      return;
+    }
+
+    // Wait for the event
+    const onInstallable = () => {
+      if (!localStorage.getItem("pwa-dismissed")) setShow(true);
     };
-    window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+    window.addEventListener("pwa-installable", onInstallable);
+    return () => window.removeEventListener("pwa-installable", onInstallable);
   }, []);
 
   async function handleInstall() {
-    if (deferredPrompt) {
-      await deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === "accepted") {
-        setIsInstalled(true);
-      }
-      setDeferredPrompt(null);
+    const prompt = getInstallPrompt();
+    if (prompt) {
+      await prompt.prompt();
+      const { outcome } = await prompt.userChoice;
+      if (outcome === "accepted") clearInstallPrompt();
     }
     setShow(false);
   }
 
   function handleDismiss() {
-    localStorage.setItem(isIos ? "pwa-ios-dismissed" : "pwa-dismissed", "1");
+    localStorage.setItem(ios ? "pwa-ios-dismissed" : "pwa-dismissed", "1");
     setShow(false);
   }
 
-  if (!show || isInstalled) return null;
+  if (!show) return null;
 
   return (
     <div className="fixed bottom-20 left-4 right-4 z-50 animate-in slide-in-from-bottom-4 duration-300">
@@ -75,30 +59,27 @@ export function InstallPrompt() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-gray-800">Install Telur Acong</p>
-          {isIos ? (
+          {ios ? (
             <p className="text-xs text-gray-500 mt-0.5">
               Tap <span className="font-medium">Share</span> lalu pilih{" "}
-              <span className="font-medium">Add to Home Screen</span> untuk install.
+              <span className="font-medium">Add to Home Screen</span>.
             </p>
           ) : (
-            <p className="text-xs text-gray-500 mt-0.5">
-              Install sebagai aplikasi untuk akses lebih cepat tanpa browser.
-            </p>
-          )}
-          {!isIos && (
-            <Button
-              size="sm"
-              onClick={handleInstall}
-              className="mt-2 h-8 bg-green-600 hover:bg-green-700 text-xs px-3"
-            >
-              Install Sekarang
-            </Button>
+            <>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Install sebagai aplikasi untuk akses lebih cepat.
+              </p>
+              <Button
+                size="sm"
+                onClick={handleInstall}
+                className="mt-2 h-8 bg-green-600 hover:bg-green-700 text-xs px-3"
+              >
+                Install Sekarang
+              </Button>
+            </>
           )}
         </div>
-        <button
-          onClick={handleDismiss}
-          className="text-gray-400 hover:text-gray-600 flex-shrink-0 p-0.5"
-        >
+        <button onClick={handleDismiss} className="text-gray-400 hover:text-gray-600 flex-shrink-0 p-0.5">
           <X className="w-4 h-4" />
         </button>
       </div>
