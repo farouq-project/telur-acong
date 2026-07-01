@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Download, X, Share } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import { getInstallPrompt, clearInstallPrompt, isIosSafari } from "@/lib/pwa";
 
 function shouldShow(): boolean {
@@ -15,6 +16,7 @@ function shouldShow(): boolean {
 export function PWAInstallButton() {
   const [visible, setVisible] = useState(false);
   const [showIos, setShowIos] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     setVisible(shouldShow());
@@ -48,14 +50,25 @@ export function PWAInstallButton() {
       return;
     }
 
-    // beforeinstallprompt hasn't fired yet on this page load.
-    // Reload once so Chrome re-evaluates installability with the corrected
-    // start_url (now returns 200 instead of 302) and active service worker.
+    // Chrome hasn't approved install yet.
+    // Reload once so Chrome re-evaluates the updated service worker.
     if (!sessionStorage.getItem("__pwa_reload")) {
       sessionStorage.setItem("__pwa_reload", "1");
-      window.location.reload();
+      toast({
+        title: "Menyiapkan instalasi…",
+        description: "Halaman akan dimuat ulang sebentar.",
+        duration: 2000,
+      });
+      setTimeout(() => window.location.reload(), 500);
+      return;
     }
-    // If already reloaded and still no prompt: Chrome isn't ready yet — do nothing.
+
+    // Already reloaded — Chrome still not ready (engagement/cooldown period).
+    toast({
+      title: "Chrome belum siap",
+      description: "Buka aplikasi beberapa kali lagi, lalu tap tombol ini.",
+      duration: 4000,
+    });
   }
 
   if (!visible) return null;

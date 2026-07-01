@@ -1,5 +1,5 @@
-// Hontalin PWA Service Worker v3
-const CACHE_VERSION = "v3";
+// Hontalin PWA Service Worker v4
+const CACHE_VERSION = "v4";
 const STATIC_CACHE  = "hontalin-static-"  + CACHE_VERSION;
 const DYNAMIC_CACHE = "hontalin-dynamic-" + CACHE_VERSION;
 
