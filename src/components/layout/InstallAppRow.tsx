@@ -80,7 +80,7 @@ export function InstallAppRow() {
                 ? "Tap untuk lihat cara install di iPhone"
                 : canInstall
                 ? "Tap untuk install di perangkat ini"
-                : "Buka di Chrome untuk install"}
+                : "Muat ulang halaman lalu coba lagi"}
             </span>
           )}
         </div>
