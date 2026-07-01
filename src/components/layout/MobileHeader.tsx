@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { PWAInstallButton } from "@/components/layout/PWAInstallButton";
 
 interface MobileHeaderProps {
   title: string;
@@ -58,6 +59,9 @@ export function MobileHeader({ title }: MobileHeaderProps) {
         )}
 
         <div className="flex items-center gap-1">
+          {/* PWA Install */}
+          <PWAInstallButton />
+
           {/* Notification Bell */}
           <Link href="/notifications">
             <Button variant="ghost" size="icon" className="relative h-9 w-9">
