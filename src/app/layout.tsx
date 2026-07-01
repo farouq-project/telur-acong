@@ -33,6 +33,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id">
+      <head>
+        {/* Capture beforeinstallprompt before React bundle loads */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.__pwa_prompt=null;window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__pwa_prompt=e;window.dispatchEvent(new CustomEvent('pwa-installable'));});window.addEventListener('appinstalled',function(){window.__pwa_prompt=null;window.dispatchEvent(new CustomEvent('pwa-installed'));});`,
+          }}
+        />
+      </head>
       <body className={inter.className}>
         <Providers>
           {children}
