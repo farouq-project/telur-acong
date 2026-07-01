@@ -2,9 +2,10 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUpDown, ArrowUp, ArrowDown, ClipboardList } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, ClipboardList, FileDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { formatNumber, todayISO } from "@/lib/utils";
 import type { HouseReport } from "@/services/production.service";
 
@@ -103,17 +104,56 @@ export function HouseReportCard({
     return arr;
   }, [houseReport, sortCol, sortDir]);
 
+  async function exportToExcel() {
+    const XLSX = await import("xlsx");
+    const rows = sorted.map((h) => ({
+      Kandang: h.house,
+      Populasi: h.populasi ?? 0,
+      Mati: h.mati,
+      "Umur (mgg)": h.umurAyam ?? "",
+      "Pakan (kg)": h.pakanKg,
+      "Telur Bagus (kg)": h.telurBagusKg,
+      "Telur Retak (kg)": h.telurRetakKg,
+      "Butir Bagus": h.butirBagus ?? 0,
+      "Butir Retak": h.butirRetak ?? 0,
+      "FCR (avg)": h.fcr != null ? parseFloat(h.fcr.toFixed(3)) : "",
+      "HD % (avg)": h.hd != null ? parseFloat(h.hd.toFixed(1)) : "",
+      "FI (avg)": h.feedIntake != null ? parseFloat(h.feedIntake.toFixed(3)) : "",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const colWidths = [
+      { wch: 14 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 10 },
+      { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
+    ];
+    ws["!cols"] = colWidths;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Laporan Produksi");
+    const suffix = from && to ? `${from}_${to}` : from ? `dari_${from}` : todayISO();
+    XLSX.writeFile(wb, `laporan-produksi-${suffix}.xlsx`);
+  }
+
   const thBase = "font-medium px-2 py-1.5 select-none cursor-pointer hover:bg-gray-100 active:bg-gray-200 whitespace-nowrap";
   const presetBtn = "px-2.5 h-8 rounded-lg text-xs font-medium border border-gray-200 bg-white text-gray-600 hover:bg-gray-50";
   const presetBtnActive = "px-2.5 h-8 rounded-lg text-xs font-medium border border-green-600 bg-green-600 text-white";
 
   return (
     <Card>
-      <CardHeader className="pb-2 pt-4 px-4">
+      <CardHeader className="pb-2 pt-4 px-4 flex-row items-center justify-between">
         <CardTitle className="text-sm flex items-center gap-2">
           <ClipboardList className="w-4 h-4 text-green-600" />
           Laporan Produksi
         </CardTitle>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={exportToExcel}
+          className="h-7 px-2 text-xs gap-1 border-green-200 text-green-700 hover:bg-green-50"
+        >
+          <FileDown className="w-3.5 h-3.5" />
+          Excel
+        </Button>
       </CardHeader>
       <CardContent className="px-2 pb-4">
         {/* Filter bar */}

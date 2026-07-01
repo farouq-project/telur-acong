@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { RoleGuard } from "@/components/layout/RoleGuard";
+import { InstallPrompt } from "@/components/layout/InstallPrompt";
 
 export default async function DashboardLayout({
   children,
@@ -19,6 +20,7 @@ export default async function DashboardLayout({
         {children}
       </main>
       <BottomNav />
+      <InstallPrompt />
     </div>
   );
 }
