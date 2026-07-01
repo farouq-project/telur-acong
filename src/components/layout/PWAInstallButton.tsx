@@ -1,14 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, X, Share, MoreVertical, Loader2 } from "lucide-react";
+import { Download, X, Share, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  getInstallPrompt,
-  clearInstallPrompt,
-  isIosSafari,
-  type BeforeInstallPromptEvent,
-} from "@/lib/pwa";
+import { getInstallPrompt, clearInstallPrompt, isIosSafari } from "@/lib/pwa";
 
 function shouldShow(): boolean {
   if (typeof window === "undefined") return false;
@@ -17,28 +12,10 @@ function shouldShow(): boolean {
   return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 }
 
-// Wait up to `ms` milliseconds for Chrome to fire beforeinstallprompt.
-// Chrome sometimes fires it only after the first user interaction.
-function awaitPrompt(ms: number): Promise<BeforeInstallPromptEvent | null> {
-  return new Promise((resolve) => {
-    const already = getInstallPrompt();
-    if (already) { resolve(already); return; }
-
-    const handler = () => resolve(getInstallPrompt());
-    window.addEventListener("pwa-installable", handler, { once: true });
-
-    setTimeout(() => {
-      window.removeEventListener("pwa-installable", handler);
-      resolve(getInstallPrompt()); // one final check after timeout
-    }, ms);
-  });
-}
-
 type Info = "none" | "ios" | "manual";
 
 export function PWAInstallButton() {
   const [visible, setVisible] = useState(false);
-  const [waiting, setWaiting] = useState(false);
   const [info, setInfo] = useState<Info>("none");
 
   useEffect(() => {
@@ -54,28 +31,14 @@ export function PWAInstallButton() {
   }, []);
 
   async function handleClick() {
-    // iOS Safari doesn't support beforeinstallprompt
     if (isIosSafari()) {
       setInfo(info === "ios" ? "none" : "ios");
       return;
     }
 
-    // Try the native prompt immediately
-    let prompt = getInstallPrompt();
-
-    if (!prompt) {
-      // Chrome fires beforeinstallprompt after first user interaction on some
-      // versions — wait up to 3 s before falling back to manual instructions.
-      setWaiting(true);
-      if ("serviceWorker" in navigator) {
-        try { await navigator.serviceWorker.ready; } catch { /* ignore */ }
-      }
-      prompt = await awaitPrompt(3000);
-      setWaiting(false);
-    }
+    const prompt = getInstallPrompt();
 
     if (prompt) {
-      // Native Chrome PWA install dialog
       await prompt.prompt();
       const { outcome } = await prompt.userChoice;
       if (outcome === "accepted") {
@@ -86,8 +49,7 @@ export function PWAInstallButton() {
       return;
     }
 
-    // Prompt still not available — Chrome hasn't approved this site yet.
-    // Show manual fallback.
+    // beforeinstallprompt hasn't fired yet — show manual fallback
     setInfo(info === "manual" ? "none" : "manual");
   }
 
@@ -100,12 +62,9 @@ export function PWAInstallButton() {
         size="icon"
         className="h-9 w-9 text-green-600"
         onClick={handleClick}
-        disabled={waiting}
         title="Install Aplikasi"
       >
-        {waiting
-          ? <Loader2 className="w-4 h-4 animate-spin text-green-600" />
-          : <Download className="w-5 h-5" />}
+        <Download className="w-5 h-5" />
       </Button>
 
       {info === "ios" && (
