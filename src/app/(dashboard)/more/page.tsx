@@ -18,7 +18,6 @@ import {
 import { MobileHeader } from "@/components/layout/MobileHeader";
 import { Separator } from "@/components/ui/separator";
 import { isPathAllowed } from "@/lib/access";
-import { InstallAppRow } from "@/components/layout/InstallAppRow";
 
 const menuItems = [
   {
@@ -95,7 +94,7 @@ export default function MorePage() {
                   </div>
                 );
               })}
-              {section.section === "Pengaturan" && <InstallAppRow />}
+
             </div>
           </div>
         ))}
