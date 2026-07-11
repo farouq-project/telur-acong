@@ -44,8 +44,8 @@ export async function GET(request: NextRequest) {
         data = result.data.map((r) => ({
           Tanggal: formatDate(r.date),
           Pelanggan: r.customerName,
-          Jumlah: r.qtySold,
-          "Harga Satuan": r.unitPrice,
+          "Jumlah (kg)": r.qtySold,
+          "Harga/kg": r.unitPrice,
           Total: r.totalValue,
           Catatan: r.notes ?? "",
         }));

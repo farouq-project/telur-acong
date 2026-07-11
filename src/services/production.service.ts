@@ -16,6 +16,7 @@ export interface CreateProductionInput {
   feedPricePerKg?: number;
   feedProductId?: string;
   mortality?: number;
+  afkir?: number;
   umurAyam?: number;
   notes?: string;
 }
@@ -35,6 +36,7 @@ function serializeRecord(r: {
   feedPricePerKg: unknown;
   feedProductId: string | null;
   mortality: number | null;
+  afkir: number | null;
   umurAyam: number | null;
   notes: string | null;
   createdAt: Date;
@@ -164,6 +166,7 @@ export async function createProduction(input: CreateProductionInput) {
         feedPricePerKg: input.feedPricePerKg ?? null,
         feedProductId: input.feedProductId ?? null,
         mortality: input.mortality ?? null,
+        afkir: input.afkir ?? null,
         notes: input.notes,
       },
     });
@@ -189,6 +192,7 @@ function buildProductionData(input: CreateProductionInput) {
     feedPricePerKg: input.feedPricePerKg ?? null,
     feedProductId: input.feedProductId ?? null,
     mortality: input.mortality ?? null,
+    afkir: input.afkir ?? null,
     umurAyam: input.umurAyam ?? null,
     notes: input.notes ?? null,
   };
@@ -251,6 +255,7 @@ export async function updateProduction(
         ...(input.feedPricePerKg !== undefined && { feedPricePerKg: input.feedPricePerKg }),
         ...(input.feedProductId !== undefined && { feedProductId: input.feedProductId }),
         ...(input.mortality !== undefined && { mortality: input.mortality }),
+        ...(input.afkir !== undefined && { afkir: input.afkir }),
         ...(input.umurAyam !== undefined && { umurAyam: input.umurAyam }),
         ...(input.notes !== undefined && { notes: input.notes }),
       },

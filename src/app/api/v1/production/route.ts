@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { date, house, populasi, goodEggs, crackedEggs, rejectedEggs,
-            goodEggsKg, crackedEggsKg, rejectedEggsKg, feedQtyKg, feedProductId, mortality, umurAyam, notes } = body;
+            goodEggsKg, crackedEggsKg, rejectedEggsKg, feedQtyKg, feedProductId, mortality, afkir, umurAyam, notes } = body;
 
     if (!date || !house || goodEggs === undefined) {
       return NextResponse.json({ error: "Data tidak lengkap" }, { status: 400 });
@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
       feedQtyKg: feedQtyKg != null ? parseFloat(feedQtyKg) : undefined,
       feedProductId: feedProductId != null && feedProductId !== "" ? String(feedProductId) : undefined,
       mortality: mortality != null ? parseInt(mortality) : undefined,
+      afkir: afkir != null ? parseInt(afkir) : undefined,
       umurAyam: umurAyam != null ? parseInt(umurAyam) : undefined,
       notes,
     });

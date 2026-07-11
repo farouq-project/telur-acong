@@ -45,6 +45,7 @@ export async function PUT(
       feedQtyKg: body.feedQtyKg != null ? parseFloat(body.feedQtyKg) : undefined,
       feedProductId: body.feedProductId !== undefined ? (body.feedProductId || null) : undefined,
       mortality: body.mortality != null ? parseInt(body.mortality) : undefined,
+      afkir: body.afkir != null ? parseInt(body.afkir) : undefined,
       umurAyam: body.umurAyam != null ? parseInt(body.umurAyam) : undefined,
       notes: body.notes,
     });

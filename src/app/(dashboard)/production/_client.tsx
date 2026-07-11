@@ -213,6 +213,7 @@ const schema = z.object({
   feedQtyKg: z.coerce.number().min(0).optional().or(z.literal("")),
   feedProductId: z.string().optional().or(z.literal("")),
   mortality: z.coerce.number().min(0).optional().or(z.literal("")),
+  afkir: z.coerce.number().min(0).optional().or(z.literal("")),
   umurAyam: z.coerce.number().min(0).optional().or(z.literal("")),
   notes: z.string().optional(),
 });
@@ -270,6 +271,7 @@ const TABLE_COLS: { key: string; label: string; align?: "right" }[] = [
   { key: "feedQtyKg",    label: "Pakan (kg)",  align: "right" },
   { key: "populasi",     label: "Populasi",    align: "right" },
   { key: "mortality",    label: "Mati",        align: "right" },
+  { key: "afkir",        label: "Afkir",       align: "right" },
   { key: "umurAyam",     label: "Umur (mgg)",  align: "right" },
   { key: "hd",           label: "HD %",        align: "right" },
   { key: "fi",           label: "FI",          align: "right" },
@@ -350,6 +352,7 @@ function ProductionTable({
                 <td className="px-2 py-1.5 text-right font-mono text-amber-600">{r.feedQtyKg != null ? r.feedQtyKg : <span className="text-gray-300">—</span>}</td>
                 <td className="px-2 py-1.5 text-right font-mono">{r.populasi != null ? formatNumber(r.populasi) : <span className="text-gray-300">—</span>}</td>
                 <td className="px-2 py-1.5 text-right font-mono text-red-500">{r.mortality != null && r.mortality > 0 ? r.mortality : <span className="text-gray-300">—</span>}</td>
+                <td className="px-2 py-1.5 text-right font-mono text-orange-500">{r.afkir != null && r.afkir > 0 ? r.afkir : <span className="text-gray-300">—</span>}</td>
                 <td className="px-2 py-1.5 text-right font-mono text-gray-600">
                   {(() => {
                     const v = r.umurAyam ?? computeUmurSuggestion(r, allRecords);
@@ -492,7 +495,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
     date: todayISO(), house: "", goodEggs: 0, crackedEggs: 0,
     populasi: "" as const, goodEggsKg: "" as const, crackedEggsKg: "" as const,
     feedQtyKg: "" as const, feedProductId: "" as const,
-    mortality: "" as const, umurAyam: "" as const, notes: "",
+    mortality: "" as const, afkir: "" as const, umurAyam: "" as const, notes: "",
   };
 
   // Tracks the last value written by the umurAyam auto-fill effect so we can
@@ -521,6 +524,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
       feedQtyKg: record.feedQtyKg ?? "",
       feedProductId: record.feedProductId ?? "",
       mortality: record.mortality ?? "",
+      afkir: record.afkir ?? "",
       umurAyam: umurValue,
       notes: record.notes ?? "",
     });
@@ -541,6 +545,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
         feedQtyKg: data.feedQtyKg !== "" ? data.feedQtyKg : null,
         feedProductId: data.feedProductId !== "" ? data.feedProductId : null,
         mortality: data.mortality !== "" ? data.mortality : null,
+        afkir: data.afkir !== "" ? data.afkir : null,
         umurAyam: data.umurAyam !== "" ? data.umurAyam : null,
       };
       const res = await fetch(url, {
@@ -1008,7 +1013,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Populasi (ekor)</Label>
                   <Input type="number" min="0" className="h-11" placeholder="0" {...form.register("populasi")} />
@@ -1016,6 +1021,10 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
                 <div className="space-y-1.5">
                   <Label className="text-xs">Kematian (ekor)</Label>
                   <Input type="number" min="0" className="h-11" placeholder="0" {...form.register("mortality")} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Afkir (ekor)</Label>
+                  <Input type="number" min="0" className="h-11" placeholder="0" {...form.register("afkir")} />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Umur Ayam (mgg)</Label>

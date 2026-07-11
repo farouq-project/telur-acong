@@ -31,6 +31,7 @@ export interface EggProduction {
   feedPricePerKg?: number | null;
   feedProductId?: string | null;
   mortality?: number | null;
+  afkir?: number | null;
   umurAyam?: number | null;
   notes?: string | null;
   createdAt: string;
