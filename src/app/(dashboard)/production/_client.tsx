@@ -416,6 +416,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [pageSize, setPageSize] = useState<"50" | "100" | "200" | "all">("all");
+  const [anchorRecords, setAnchorRecords] = useState<EggProduction[]>(initialData);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function toggleFilterHouse(name: string) {
@@ -452,6 +453,14 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
       setFetching(false);
     }
   }, [search, filterHouses, dateFrom, dateTo, hasActiveFilter, pageSize]);
+
+  async function fetchAnchorData() {
+    try {
+      const res = await fetch("/api/v1/production?limit=5000");
+      const json = await res.json();
+      setAnchorRecords(json.data ?? []);
+    } catch { /* non-critical, keep existing anchors */ }
+  }
 
   const isFirstFetch = useRef(true);
   useEffect(() => {
@@ -559,6 +568,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
       toast({ variant: "success", title: editingId ? "Data diperbarui" : "Data ditambahkan" });
       setIsSheetOpen(false);
       fetchData();
+      fetchAnchorData();
     } catch (err) {
       toast({ variant: "destructive", title: "Gagal", description: err instanceof Error ? err.message : "Terjadi kesalahan" });
     } finally {
@@ -575,6 +585,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
       toast({ variant: "success", title: "Data dihapus" });
       setDeleteId(null);
       fetchData();
+      fetchAnchorData();
     } catch (err) {
       toast({ variant: "destructive", title: "Gagal", description: err instanceof Error ? err.message : "Terjadi kesalahan" });
     } finally {
@@ -616,6 +627,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
       setSelectedIds([]);
       setSelectMode(false);
       fetchData();
+      fetchAnchorData();
     } catch (err) {
       toast({ variant: "destructive", title: "Gagal", description: err instanceof Error ? err.message : "Terjadi kesalahan" });
     } finally {
@@ -668,6 +680,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
       setImportOpen(false);
       setImportResult(null);
       fetchData();
+      fetchAnchorData();
     } catch (err) {
       toast({
         variant: "destructive",
@@ -705,7 +718,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
     if (!watchedHouse) return;
     const kematian = watchedMortality === "" || watchedMortality == null ? 0 : Number(watchedMortality);
 
-    const previousRecord = records
+    const previousRecord = anchorRecords
       .filter((r) => r.house.trim().toLowerCase() === watchedHouse.trim().toLowerCase() && r.populasi != null)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
 
@@ -719,7 +732,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
       form.setValue("populasi", Math.max(0, house.currentPopulation - kematian));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedHouse, watchedMortality, editingId, records, houses]);
+  }, [watchedHouse, watchedMortality, editingId, anchorRecords, houses]);
 
   // Auto-isi Umur Ayam = umur ayam catatan sebelumnya + selisih minggu (1 minggu = 7 hari).
   // Only fills when the field is empty or still holds the last auto-suggested value,
@@ -728,7 +741,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
     if (editingId) return;
     if (!watchedHouse || !watchedDate) return;
 
-    const previousRecord = records
+    const previousRecord = anchorRecords
       .filter((r) => r.house.trim().toLowerCase() === watchedHouse.trim().toLowerCase() && r.umurAyam != null)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
 
@@ -746,7 +759,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedHouse, watchedDate, editingId, records]);
+  }, [watchedHouse, watchedDate, editingId, anchorRecords]);
 
   return (
     <>
@@ -912,7 +925,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
         ) : (
           <ProductionTable
             records={displayRecords}
-            allRecords={records}
+            allRecords={anchorRecords}
             sortCol={sortCol}
             sortDir={sortDir}
             selectMode={selectMode}

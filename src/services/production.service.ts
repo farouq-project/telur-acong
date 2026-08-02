@@ -434,7 +434,43 @@ export async function getProductionReportByHouse(params?: { from?: string; to?: 
     if (r.umurAyam != null) entry.umurAyam = r.umurAyam;
   }
 
+  // For houses with no umurAyam in the filtered range, extrapolate from the nearest global anchor
+  const housesNeedingUmur = Array.from(map.keys()).filter((h) => map.get(h)!.umurAyam == null);
+  if (housesNeedingUmur.length > 0) {
+    const refDate = to ? new Date(to) : new Date();
+    const anchors = await Promise.all(
+      housesNeedingUmur.map((house) =>
+        prisma.eggProduction.findFirst({
+          where: { house, umurAyam: { not: null } },
+          orderBy: { date: "desc" },
+          select: { house: true, date: true, umurAyam: true },
+        })
+      )
+    );
+    for (const anchor of anchors) {
+      if (!anchor) continue;
+      const entry = map.get(anchor.house);
+      if (!entry) continue;
+      const daysDiff = Math.round((refDate.getTime() - anchor.date.getTime()) / 86400000);
+      entry.umurAyam = Math.max(0, anchor.umurAyam! + Math.floor(daysDiff / 7));
+    }
+  }
+
   return Array.from(map.values()).sort((a, b) => a.house.localeCompare(b.house));
+}
+
+export async function getAfkirLogByHouse(): Promise<Record<string, { date: string; afkir: number }[]>> {
+  const records = await prisma.eggProduction.findMany({
+    where: { afkir: { gt: 0 } },
+    select: { house: true, date: true, afkir: true },
+    orderBy: { date: "desc" },
+  });
+  const result: Record<string, { date: string; afkir: number }[]> = {};
+  for (const r of records) {
+    if (!result[r.house]) result[r.house] = [];
+    result[r.house].push({ date: r.date.toISOString(), afkir: r.afkir! });
+  }
+  return result;
 }
 
 export interface EggFlowDay {

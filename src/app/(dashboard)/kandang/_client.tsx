@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { formatNumber } from "@/lib/utils";
+import { formatDate, formatNumber } from "@/lib/utils";
 import type { House } from "@/types";
 
 const schema = z.object({
@@ -28,9 +28,10 @@ type FormData = z.infer<typeof schema>;
 
 interface Props {
   initialData: House[];
+  afkirLog?: Record<string, { date: string; afkir: number }[]>;
 }
 
-export default function KandangClient({ initialData }: Props) {
+export default function KandangClient({ initialData, afkirLog = {} }: Props) {
   const { data: session } = useSession();
   const { toast } = useToast();
   const [houses, setHouses] = useState<House[]>(initialData);
@@ -156,6 +157,23 @@ export default function KandangClient({ initialData }: Props) {
                       Populasi saat ini: <span className="font-medium text-gray-700">{formatNumber(h.currentPopulation)}</span> ekor
                     </p>
                     {h.notes && <p className="text-xs text-gray-400 mt-1 truncate">{h.notes}</p>}
+                    {(afkirLog[h.name]?.length ?? 0) > 0 && (
+                      <div className="mt-2 pt-2 border-t border-gray-100">
+                        <p className="text-xs font-medium text-orange-600 mb-1">
+                          Afkir — {afkirLog[h.name].length} catatan, total {afkirLog[h.name].reduce((s, a) => s + a.afkir, 0).toLocaleString("id-ID")} ekor
+                        </p>
+                        <div className="space-y-0.5">
+                          {afkirLog[h.name].slice(0, 5).map((a, i) => (
+                            <p key={i} className="text-xs text-gray-500">
+                              {formatDate(a.date)}: <span className="text-orange-500 font-medium">{a.afkir.toLocaleString("id-ID")} ekor</span>
+                            </p>
+                          ))}
+                          {afkirLog[h.name].length > 5 && (
+                            <p className="text-xs text-gray-400">+{afkirLog[h.name].length - 5} catatan lainnya</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="flex gap-1 ml-2">
                     <button onClick={() => openEdit(h)} className="p-2 rounded-lg hover:bg-gray-100 active:bg-gray-200">
