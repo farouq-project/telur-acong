@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { addDays, parseISO } from "date-fns";
 import {
-  Plus, Search, Edit2, Trash2, Loader2, X, FileText, Printer,
+  Plus, Search, Edit2, Trash2, Loader2, X, FileText, Printer, FileDown,
   ArrowUpDown, ArrowUp, ArrowDown, ListChecks, CheckSquare, Square,
 } from "lucide-react";
 import { MobileHeader } from "@/components/layout/MobileHeader";
@@ -368,6 +368,38 @@ export default function SalesClient({ initialData }: Props) {
     });
   }, [records, sortCol, sortDir]);
 
+  async function exportToExcel() {
+    const XLSX = await import("xlsx");
+    const rows = displayRecords.map((r) => {
+      const due = r.jatuhTempoDays != null ? dueDate(r.date, r.jatuhTempoDays) : null;
+      return {
+        Tanggal: formatDate(r.date),
+        Pelanggan: r.customerName,
+        "Jenis Telur": r.eggType ? (EGG_TYPE_LABELS[r.eggType] ?? r.eggType) : "",
+        "Jumlah (kg)": Number(r.qtySold),
+        "Harga/kg": Number(r.unitPrice),
+        Total: Number(r.totalValue),
+        "Jatuh Tempo": due ? formatDate(due) : "",
+        "No. Invoice": r.invoiceNo ?? "",
+        Catatan: r.notes ?? "",
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [
+      { wch: 14 }, { wch: 22 }, { wch: 14 }, { wch: 12 },
+      { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 24 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Penjualan Telur");
+    const suffix = dateFrom && dateTo
+      ? `${dateFrom}_${dateTo}`
+      : dateFrom ? `dari_${dateFrom}`
+      : dateTo ? `sd_${dateTo}`
+      : todayISO();
+    XLSX.writeFile(wb, `penjualan-${suffix}.xlsx`);
+    toast({ variant: "success", title: "File Excel diunduh" });
+  }
+
   function openCreate() {
     form.reset({ date: todayISO(), customerName: "", eggType: "", qtySold: 1, unitPrice: 0, jatuhTempoDays: "", notes: "" });
     setEditingId(null);
@@ -527,6 +559,18 @@ export default function SalesClient({ initialData }: Props) {
               </button>
             ))}
           </div>
+
+          {displayRecords.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5 text-xs shrink-0 border-green-200 text-green-700 hover:bg-green-50"
+              onClick={exportToExcel}
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              Excel
+            </Button>
+          )}
 
           {isOwner && (
             <Button
