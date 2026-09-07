@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate, formatNumber, todayISO } from "@/lib/utils";
-import type { EggProduction, House, FeedProduct } from "@/types";
+import type { EggProduction, House, FeedProduct, ProductionAnchor } from "@/types";
 
 // ─── Import Excel: kolom template & parsing ──────────────────────────────────
 
@@ -224,11 +224,15 @@ interface Props {
   initialData: EggProduction[];
   houses: House[];
   feedProducts: FeedProduct[];
+  initialAnchors: ProductionAnchor[];
 }
 
 // Given any record with null umurAyam, find the nearest anchor record for the
 // same kandang that *does* have umurAyam set, then extrapolate by week diff.
-function computeUmurSuggestion(record: EggProduction, allRecords: EggProduction[]): number | null {
+function computeUmurSuggestion(
+  record: EggProduction,
+  allRecords: Pick<EggProduction, "id" | "date" | "house" | "umurAyam">[]
+): number | null {
   const anchors = allRecords.filter(
     (r) => r.id !== record.id &&
       r.house.trim().toLowerCase() === record.house.trim().toLowerCase() &&
@@ -290,7 +294,7 @@ function ProductionTable({
   onSort, onToggleSelected, onEdit, onDelete,
 }: {
   records: EggProduction[];
-  allRecords: EggProduction[];
+  allRecords: Pick<EggProduction, "id" | "date" | "house" | "umurAyam">[];
   sortCol: string;
   sortDir: "asc" | "desc";
   selectMode: boolean;
@@ -391,7 +395,7 @@ function ProductionTable({
   );
 }
 
-export default function ProductionClient({ initialData, houses, feedProducts }: Props) {
+export default function ProductionClient({ initialData, houses, feedProducts, initialAnchors }: Props) {
   const { data: session } = useSession();
   const { toast } = useToast();
   const [records, setRecords] = useState<EggProduction[]>(initialData);
@@ -415,8 +419,8 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
-  const [pageSize, setPageSize] = useState<"50" | "100" | "200" | "all">("all");
-  const [anchorRecords, setAnchorRecords] = useState<EggProduction[]>(initialData);
+  const [pageSize, setPageSize] = useState<"50" | "100" | "200" | "all">("50");
+  const [anchorRecords, setAnchorRecords] = useState<ProductionAnchor[]>(initialAnchors);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function toggleFilterHouse(name: string) {
@@ -456,7 +460,7 @@ export default function ProductionClient({ initialData, houses, feedProducts }: 
 
   async function fetchAnchorData() {
     try {
-      const res = await fetch("/api/v1/production?limit=5000");
+      const res = await fetch("/api/v1/production/anchors");
       const json = await res.json();
       setAnchorRecords(json.data ?? []);
     } catch { /* non-critical, keep existing anchors */ }

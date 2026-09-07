@@ -459,6 +459,26 @@ export async function getProductionReportByHouse(params?: { from?: string; to?: 
   return Array.from(map.values()).sort((a, b) => a.house.localeCompare(b.house));
 }
 
+export interface ProductionAnchor {
+  id: string;
+  date: string;
+  house: string;
+  populasi: number | null;
+  umurAyam: number | null;
+}
+
+// Baris ringan (bukan seluruh kolom EggProduction) untuk auto-fill Populasi/Umur Ayam
+// di form Produksi — mencari anchor terdekat per kandang tanpa menarik ~16 kolom penuh
+// (termasuk Decimal kg/pakan) untuk ribuan baris.
+export async function getProductionAnchors(): Promise<ProductionAnchor[]> {
+  const records = await prisma.eggProduction.findMany({
+    where: { OR: [{ populasi: { not: null } }, { umurAyam: { not: null } }] },
+    select: { id: true, date: true, house: true, populasi: true, umurAyam: true },
+    orderBy: { date: "desc" },
+  });
+  return records.map((r) => ({ ...r, date: r.date.toISOString() }));
+}
+
 export async function getAfkirLogByHouse(): Promise<Record<string, { date: string; afkir: number }[]>> {
   const records = await prisma.eggProduction.findMany({
     where: { afkir: { gt: 0 } },

@@ -1,4 +1,4 @@
-import { getProductions } from "@/services/production.service";
+import { getProductions, getProductionAnchors } from "@/services/production.service";
 import { getHouses } from "@/services/house.service";
 import { getFeedProducts } from "@/services/feed.service";
 import ProductionClient from "./_client";
@@ -6,10 +6,11 @@ import ProductionClient from "./_client";
 export const dynamic = "force-dynamic";
 
 export default async function ProductionPage() {
-  const [{ data }, houses, rawFeedProducts] = await Promise.all([
-    getProductions({ limit: 5000 }),
+  const [{ data }, houses, rawFeedProducts, anchors] = await Promise.all([
+    getProductions({ limit: 50 }),
     getHouses(),
     getFeedProducts(),
+    getProductionAnchors(),
   ]);
 
   const feedProducts = rawFeedProducts.map((p) => ({
@@ -19,5 +20,12 @@ export default async function ProductionPage() {
     createdAt: p.createdAt.toISOString(),
   }));
 
-  return <ProductionClient initialData={data} houses={houses} feedProducts={feedProducts} />;
+  return (
+    <ProductionClient
+      initialData={data}
+      houses={houses}
+      feedProducts={feedProducts}
+      initialAnchors={anchors}
+    />
+  );
 }

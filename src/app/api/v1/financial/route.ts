@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { getFinancialNotes, getFinancialSummary, createFinancialNote } from "@/services/financial.service";
+import { parseLimit } from "@/lib/api-utils";
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
     const to = searchParams.get("to") ?? undefined;
 
     const [result, summary] = await Promise.all([
-      getFinancialNotes({ from, to, limit: parseInt(searchParams.get("limit") ?? "100") }),
+      getFinancialNotes({ from, to, limit: parseLimit(searchParams, 100) }),
       getFinancialSummary({ from, to }),
     ]);
 

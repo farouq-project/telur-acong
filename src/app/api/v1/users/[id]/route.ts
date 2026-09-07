@@ -21,9 +21,6 @@ export async function PUT(
       email: body.email,
       role: body.role,
       isActive: body.isActive,
-      companyName: body.companyName ?? null,
-      notes: body.notes ?? null,
-      ...(body.logoUrl !== undefined && { logoUrl: body.logoUrl || null }),
     });
 
     return NextResponse.json({ success: true, data });

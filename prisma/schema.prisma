@@ -39,6 +39,7 @@ model User {
   password    String
   role        Role     @default(STAFF)
   isActive    Boolean  @default(true)
+  // Deprecated, superseded by BusinessSettings (shared, not per-user).
   companyName String?
   notes       String?  @db.Text
   logoUrl     String?  @db.LongText
@@ -49,6 +50,20 @@ model User {
   financialNotes FinancialNote[]
 
   @@map("users")
+}
+
+model BusinessSettings {
+  id                String   @id @default("singleton")
+  companyName       String?
+  slogan            String?
+  address           String?  @db.Text
+  logoUrl           String?  @db.LongText
+  bankName          String?
+  bankAccountNumber String?
+  bankAccountHolder String?
+  updatedAt         DateTime @updatedAt
+
+  @@map("business_settings")
 }
 
 model EggProduction {

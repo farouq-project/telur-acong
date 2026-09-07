@@ -36,8 +36,6 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           email: user.email,
           role: user.role,
-          companyName: user.companyName ?? null,
-          notes: user.notes ?? null,
         };
       },
     }),
@@ -47,31 +45,13 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.role = (user as { role: UserRole }).role;
-        token.companyName = (user as { companyName?: string | null }).companyName ?? null;
-        token.notes = (user as { notes?: string | null }).notes ?? null;
-      } else if (token.id && token.notes === undefined) {
-        // Backfill claims for sessions issued before these fields existed on the JWT
-        const dbUser = await prisma.user.findUnique({
-          where: { id: token.id as string },
-          select: { companyName: true, notes: true },
-        });
-        if (dbUser) {
-          token.companyName = dbUser.companyName ?? null;
-          token.notes = dbUser.notes ?? null;
-        }
       }
-      // Never persist the logo (base64 image data) in the JWT — it bloats the
-      // session cookie past request header size limits. Drop any stale value
-      // from tokens issued before this change.
-      delete token.logoUrl;
       return token;
     },
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role;
-        session.user.companyName = token.companyName ?? null;
-        session.user.notes = token.notes ?? null;
       }
       return session;
     },

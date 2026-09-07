@@ -1,5 +1,4 @@
 import { PrismaClient } from "@prisma/client";
-import { withAccelerate } from "@prisma/extension-accelerate";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -8,7 +7,7 @@ const globalForPrisma = globalThis as unknown as {
 // On Vercel's serverless runtime each function instance opens its own Prisma
 // connection pool against the shared Hostinger MySQL server, which has a low
 // max_connections limit. Cap the pool per instance so concurrent instances
-// don't exhaust it. Skipped for Accelerate, which manages pooling itself.
+// don't exhaust it.
 function pooledDatabaseUrl(): string | undefined {
   const url = process.env.DATABASE_URL;
   if (!url) return url;
@@ -19,19 +18,12 @@ function pooledDatabaseUrl(): string | undefined {
 
 function createPrismaClient(): PrismaClient {
   const isProduction = process.env.NODE_ENV === "production";
-  const useAccelerate = isProduction && !!process.env.PRISMA_ACCELERATE_URL;
-
-  const base = new PrismaClient({
+  return new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-    ...(isProduction && !useAccelerate
+    ...(isProduction
       ? { datasources: { db: { url: pooledDatabaseUrl() } } }
       : {}),
   });
-  if (useAccelerate) {
-    // Cast to PrismaClient so downstream service return types stay fully typed
-    return base.$extends(withAccelerate()) as unknown as PrismaClient;
-  }
-  return base;
 }
 
 const prisma = globalForPrisma.prisma ?? createPrismaClient();

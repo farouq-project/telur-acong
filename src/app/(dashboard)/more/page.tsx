@@ -14,6 +14,7 @@ import {
   Wallet,
   Home,
   ClipboardList,
+  Building2,
 } from "lucide-react";
 import { MobileHeader } from "@/components/layout/MobileHeader";
 import { Separator } from "@/components/ui/separator";
@@ -39,6 +40,7 @@ const ownerItems = {
     { href: "/reports", label: "Laporan & Export", icon: FileText, color: "bg-indigo-100 text-indigo-600" },
     { href: "/notifications", label: "Notifikasi", icon: Bell, color: "bg-yellow-100 text-yellow-600" },
     { href: "/settings/users", label: "Kelola Pengguna", icon: Users, color: "bg-pink-100 text-pink-600" },
+    { href: "/settings/business", label: "Profil Bisnis", icon: Building2, color: "bg-cyan-100 text-cyan-600" },
   ],
 };
 

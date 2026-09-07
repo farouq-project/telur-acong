@@ -38,6 +38,14 @@ export interface EggProduction {
   updatedAt?: string;
 }
 
+export interface ProductionAnchor {
+  id: string;
+  date: string;
+  house: string;
+  populasi: number | null;
+  umurAyam: number | null;
+}
+
 export type EggType = "TELUR_BAGUS" | "TELUR_RETAK" | "TELUR_BULE";
 
 export interface EggSale {
@@ -202,11 +210,20 @@ export interface User {
   email: string;
   role: UserRole;
   isActive: boolean;
-  companyName?: string | null;
-  notes?: string | null;
-  logoUrl?: string | null;
   password?: string;
   createdAt: string;
+}
+
+export interface BusinessSettings {
+  id: string;
+  companyName: string | null;
+  slogan: string | null;
+  address: string | null;
+  logoUrl: string | null;
+  bankName: string | null;
+  bankAccountNumber: string | null;
+  bankAccountHolder: string | null;
+  updatedAt: string | null;
 }
 
 export interface DashboardStats {

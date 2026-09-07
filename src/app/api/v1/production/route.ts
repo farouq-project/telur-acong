@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { getProductions, createProduction } from "@/services/production.service";
+import { parseLimit } from "@/lib/api-utils";
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
       houses: housesParam ? housesParam.split(",").map((h) => h.trim()).filter(Boolean) : undefined,
       from: searchParams.get("from") ?? undefined,
       to: searchParams.get("to") ?? undefined,
-      limit: parseInt(searchParams.get("limit") ?? "50"),
+      limit: parseLimit(searchParams),
       offset: parseInt(searchParams.get("offset") ?? "0"),
     });
 

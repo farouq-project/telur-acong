@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { PWAInstallButton } from "@/components/layout/PWAInstallButton";
+import { useBusinessSettings } from "@/components/layout/BusinessSettingsProvider";
 
 interface MobileHeaderProps {
   title: string;
@@ -24,7 +25,7 @@ export function MobileHeader({ title }: MobileHeaderProps) {
   const { data: session } = useSession();
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const companyName = session?.user?.companyName;
+  const { companyName } = useBusinessSettings();
   const isDeveloper = session?.user?.role === "DEVELOPER";
   const canManageUsers = isDeveloper || session?.user?.role === "OWNER";
 
@@ -115,6 +116,14 @@ export function MobileHeader({ title }: MobileHeaderProps) {
                   <Link href="/settings/users">
                     <User className="w-4 h-4 mr-2" />
                     Kelola Pengguna
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {canManageUsers && (
+                <DropdownMenuItem asChild>
+                  <Link href="/settings/business">
+                    <Settings className="w-4 h-4 mr-2" />
+                    Profil Bisnis
                   </Link>
                 </DropdownMenuItem>
               )}

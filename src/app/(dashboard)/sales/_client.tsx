@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate, formatNumber, formatRupiah, todayISO } from "@/lib/utils";
+import { useBusinessSettings } from "@/components/layout/BusinessSettingsProvider";
 import type { EggSale } from "@/types";
 
 const EGG_TYPE_LABELS: Record<string, string> = {
@@ -50,7 +51,9 @@ interface Props {
   initialData: EggSale[];
 }
 
-function InvoiceView({ sale, companyName, companyNotes, companyLogo }: { sale: EggSale; companyName?: string | null; companyNotes?: string | null; companyLogo?: string | null }) {
+function InvoiceView({ sale }: { sale: EggSale }) {
+  const { companyName, slogan, address, logoUrl, bankName, bankAccountNumber, bankAccountHolder } = useBusinessSettings();
+  const hasBankDetails = bankName || bankAccountNumber || bankAccountHolder;
   const invoiceRef = useRef<HTMLDivElement>(null);
 
   function handlePrint() {
@@ -82,11 +85,12 @@ function InvoiceView({ sale, companyName, companyNotes, companyLogo }: { sale: E
           <div>
             <h2 className="text-lg font-bold text-gray-800">INVOICE</h2>
             {companyName && <p className="text-lg font-bold text-gray-800 subtitle">{companyName}</p>}
-            {companyNotes && <p className="text-xs text-gray-400 mt-0.5">{companyNotes}</p>}
+            {slogan && <p className="text-xs text-green-700 italic mt-0.5">{slogan}</p>}
+            {address && <p className="text-xs text-gray-400 mt-0.5">{address}</p>}
           </div>
-          {companyLogo && (
+          {logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={companyLogo} alt="Logo" className="w-12 h-12 object-contain shrink-0" />
+            <img src={logoUrl} alt="Logo" className="w-12 h-12 object-contain shrink-0" />
           )}
         </div>
         <div className="divider border-t border-dashed border-gray-200 my-3" />
@@ -137,6 +141,32 @@ function InvoiceView({ sale, companyName, companyNotes, companyLogo }: { sale: E
           <span className="font-semibold text-gray-700">Total</span>
           <span className="total text-lg font-bold text-green-700">{formatRupiah(sale.totalValue)}</span>
         </div>
+        {hasBankDetails && (
+          <>
+            <div className="divider border-t border-dashed border-gray-200 my-3" />
+            <div className="space-y-2 text-sm">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Detail Pembayaran</p>
+              {bankName && (
+                <div className="row flex justify-between">
+                  <span className="label text-gray-500">Bank</span>
+                  <span>{bankName}</span>
+                </div>
+              )}
+              {bankAccountNumber && (
+                <div className="row flex justify-between">
+                  <span className="label text-gray-500">No. Rekening</span>
+                  <span className="font-mono font-semibold">{bankAccountNumber}</span>
+                </div>
+              )}
+              {bankAccountHolder && (
+                <div className="row flex justify-between">
+                  <span className="label text-gray-500">Atas Nama</span>
+                  <span>{bankAccountHolder}</span>
+                </div>
+              )}
+            </div>
+          </>
+        )}
         {sale.notes && (
           <p className="text-xs text-gray-400 mt-3 italic">{sale.notes}</p>
         )}
@@ -287,7 +317,6 @@ export default function SalesClient({ initialData }: Props) {
   const [deleting, setDeleting] = useState(false);
   const [totalValue, setTotalValue] = useState(0);
   const [invoiceSale, setInvoiceSale] = useState<EggSale | null>(null);
-  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sortCol, setSortCol] = useState<string>("date");
@@ -339,13 +368,6 @@ export default function SalesClient({ initialData }: Props) {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, dateFrom, dateTo, pageSize]);
-
-  useEffect(() => {
-    fetch("/api/v1/profile")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => setCompanyLogo(json?.logoUrl ?? null))
-      .catch(() => setCompanyLogo(null));
-  }, []);
 
   const displayRecords = useMemo(() => {
     return [...records].sort((a, b) => {
@@ -729,14 +751,7 @@ export default function SalesClient({ initialData }: Props) {
           <SheetHeader className="mb-4">
             <SheetTitle>Invoice</SheetTitle>
           </SheetHeader>
-          {invoiceSale && (
-            <InvoiceView
-              sale={invoiceSale}
-              companyName={session?.user?.companyName}
-              companyNotes={session?.user?.notes}
-              companyLogo={companyLogo}
-            />
-          )}
+          {invoiceSale && <InvoiceView sale={invoiceSale} />}
         </SheetContent>
       </Sheet>
 
