@@ -69,7 +69,7 @@ function byDate(sortDir: "asc" | "desc") {
 
 export function DashboardCharts({ productionByHouse, salesTrend, mortalityTrend, dailyMetrics, houses }: Props) {
   const [selectedHouses, setSelectedHouses] = useState<string[]>([]);
-  const [period, setPeriod] = useState<Period>("daily");
+  const [period, setPeriod] = useState<Period>("monthly");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   function toggleHouse(name: string) {
