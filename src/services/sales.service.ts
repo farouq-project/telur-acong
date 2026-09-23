@@ -239,8 +239,10 @@ export interface EggPricePoint {
   isForecast: boolean;
 }
 
-// Rata-rata harga jual telur per bulan (dibobot kuantitas: totalValue/qtySold),
+// Rata-rata harga jual Telur Bagus per bulan (dibobot kuantitas: totalValue/qtySold),
 // plus perkiraan beberapa bulan ke depan lewat regresi linear sederhana atas tren bulanan.
+// Hanya memakai transaksi eggType TELUR_BAGUS — Telur Retak/Bule dikecualikan karena
+// harganya jauh lebih rendah dan akan mendistorsi tren harga jual utama.
 export async function getEggPriceTrend(months = 12, forecastMonths = 3): Promise<EggPricePoint[]> {
   const from = new Date();
   from.setMonth(from.getMonth() - (months - 1));
@@ -248,7 +250,7 @@ export async function getEggPriceTrend(months = 12, forecastMonths = 3): Promise
   from.setHours(0, 0, 0, 0);
 
   const records = await prisma.eggSale.findMany({
-    where: { date: { gte: from } },
+    where: { date: { gte: from }, eggType: "TELUR_BAGUS" },
     select: { date: true, qtySold: true, totalValue: true },
     orderBy: { date: "asc" },
   });

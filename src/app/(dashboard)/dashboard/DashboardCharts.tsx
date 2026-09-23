@@ -202,7 +202,7 @@ export function DashboardCharts({ productionByHouse, salesTrend, mortalityTrend,
       <TrendChart title={`Tren Produksi (${periodLabel})`} data={filteredProductionTrend} color="#16a34a" unit="butir" />
       <TrendChart title="Tren Penjualan (30 Hari)" data={salesTrend} color="#7c3aed" unit="kg" />
       <TrendChart title="Tren Kematian (30 Hari)" data={mortalityTrend} color="#ef4444" unit="ekor" />
-      <EggPriceChart title="Harga Telur per Bulan (Perkiraan)" data={eggPriceTrend} />
+      <EggPriceChart title="Harga Telur Bagus per Bulan (Perkiraan)" data={eggPriceTrend} />
     </>
   );
 }
