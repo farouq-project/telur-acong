@@ -2,8 +2,8 @@
 
 import {
   ResponsiveContainer,
-  LineChart,
-  Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -35,7 +35,7 @@ export function TrendChart({ title, data, color, unit }: TrendChartProps) {
       </CardHeader>
       <CardContent className="px-1 pb-4">
         <ResponsiveContainer width="100%" height={160}>
-          <LineChart
+          <BarChart
             data={formattedData}
             margin={{ top: 4, right: 16, left: -20, bottom: 0 }}
           >
@@ -60,15 +60,8 @@ export function TrendChart({ title, data, color, unit }: TrendChartProps) {
               }}
               formatter={(value) => [`${value} ${unit}`, "Jumlah"]}
             />
-            <Line
-              type="monotone"
-              dataKey="value"
-              stroke={color}
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 4 }}
-            />
-          </LineChart>
+            <Bar dataKey="value" fill={color} radius={[4, 4, 0, 0]} maxBarSize={28} />
+          </BarChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>

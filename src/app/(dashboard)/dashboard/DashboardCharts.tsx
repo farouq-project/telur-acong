@@ -9,6 +9,10 @@ const TrendChart = dynamic(
   () => import("@/components/dashboard/TrendChart").then((m) => m.TrendChart),
   { ssr: false, loading: () => <Skeleton className="h-[208px] w-full rounded-xl" /> }
 );
+const EggPriceChart = dynamic(
+  () => import("@/components/dashboard/EggPriceChart").then((m) => m.EggPriceChart),
+  { ssr: false, loading: () => <Skeleton className="h-[228px] w-full rounded-xl" /> }
+);
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -22,7 +26,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ListFilter, ArrowUpDown } from "lucide-react";
 import { format, startOfWeek, startOfMonth, parseISO } from "date-fns";
-import type { DailyMetric } from "@/types";
+import type { DailyMetric, EggPricePoint } from "@/types";
 
 type Period = "daily" | "weekly" | "monthly";
 
@@ -38,6 +42,7 @@ interface Props {
   mortalityTrend: { date: string; value: number }[];
   dailyMetrics: DailyMetric[];
   houses: string[];
+  eggPriceTrend: EggPricePoint[];
 }
 
 const PERIOD_LABELS: Record<Period, string> = {
@@ -67,7 +72,7 @@ function byDate(sortDir: "asc" | "desc") {
       : new Date(b.date).getTime() - new Date(a.date).getTime();
 }
 
-export function DashboardCharts({ productionByHouse, salesTrend, mortalityTrend, dailyMetrics, houses }: Props) {
+export function DashboardCharts({ productionByHouse, salesTrend, mortalityTrend, dailyMetrics, houses, eggPriceTrend }: Props) {
   const [selectedHouses, setSelectedHouses] = useState<string[]>([]);
   const [period, setPeriod] = useState<Period>("monthly");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -197,6 +202,7 @@ export function DashboardCharts({ productionByHouse, salesTrend, mortalityTrend,
       <TrendChart title={`Tren Produksi (${periodLabel})`} data={filteredProductionTrend} color="#16a34a" unit="butir" />
       <TrendChart title="Tren Penjualan (30 Hari)" data={salesTrend} color="#7c3aed" unit="kg" />
       <TrendChart title="Tren Kematian (30 Hari)" data={mortalityTrend} color="#ef4444" unit="ekor" />
+      <EggPriceChart title="Harga Telur per Bulan (Perkiraan)" data={eggPriceTrend} />
     </>
   );
 }

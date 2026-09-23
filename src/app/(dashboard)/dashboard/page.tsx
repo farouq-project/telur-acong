@@ -79,6 +79,7 @@ export default async function DashboardPage({
             mortalityTrend={stats.mortalityTrend}
             dailyMetrics={stats.dailyMetrics}
             houses={stats.houseNames}
+            eggPriceTrend={stats.eggPriceTrend}
           />
         )}
 

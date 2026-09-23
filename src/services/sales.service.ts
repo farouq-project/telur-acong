@@ -233,6 +233,70 @@ export async function getMonthlySales(): Promise<number> {
   return decimalToNumber(result._sum.qtySold);
 }
 
+export interface EggPricePoint {
+  month: string; // "YYYY-MM"
+  avgPrice: number;
+  isForecast: boolean;
+}
+
+// Rata-rata harga jual telur per bulan (dibobot kuantitas: totalValue/qtySold),
+// plus perkiraan beberapa bulan ke depan lewat regresi linear sederhana atas tren bulanan.
+export async function getEggPriceTrend(months = 12, forecastMonths = 3): Promise<EggPricePoint[]> {
+  const from = new Date();
+  from.setMonth(from.getMonth() - (months - 1));
+  from.setDate(1);
+  from.setHours(0, 0, 0, 0);
+
+  const records = await prisma.eggSale.findMany({
+    where: { date: { gte: from } },
+    select: { date: true, qtySold: true, totalValue: true },
+    orderBy: { date: "asc" },
+  });
+
+  const grouped = new Map<string, { qty: number; value: number }>();
+  for (const r of records) {
+    const key = r.date.toISOString().slice(0, 7);
+    const cur = grouped.get(key) ?? { qty: 0, value: 0 };
+    cur.qty += decimalToNumber(r.qtySold);
+    cur.value += decimalToNumber(r.totalValue);
+    grouped.set(key, cur);
+  }
+
+  const historical: EggPricePoint[] = Array.from(grouped.entries())
+    .map(([month, g]) => ({
+      month,
+      avgPrice: g.qty > 0 ? Math.round((g.value / g.qty) * 100) / 100 : 0,
+      isForecast: false,
+    }))
+    .sort((a, b) => a.month.localeCompare(b.month));
+
+  const n = historical.length;
+  if (n < 2) return historical;
+
+  // Least-squares linear regression over month index (0..n-1) vs avgPrice.
+  const xs = historical.map((_, i) => i);
+  const ys = historical.map((h) => h.avgPrice);
+  const sumX = xs.reduce((a, b) => a + b, 0);
+  const sumY = ys.reduce((a, b) => a + b, 0);
+  const sumXY = xs.reduce((a, x, i) => a + x * ys[i], 0);
+  const sumX2 = xs.reduce((a, x) => a + x * x, 0);
+  const denom = n * sumX2 - sumX * sumX;
+  const slope = denom !== 0 ? (n * sumXY - sumX * sumY) / denom : 0;
+  const intercept = (sumY - slope * sumX) / n;
+
+  const lastMonth = historical[n - 1].month;
+  const forecast: EggPricePoint[] = [];
+  for (let i = 1; i <= forecastMonths; i++) {
+    const d = new Date(`${lastMonth}-01T00:00:00Z`);
+    d.setUTCMonth(d.getUTCMonth() + i);
+    const month = d.toISOString().slice(0, 7);
+    const predicted = Math.max(0, Math.round((slope * (n - 1 + i) + intercept) * 100) / 100);
+    forecast.push({ month, avgPrice: predicted, isForecast: true });
+  }
+
+  return [...historical, ...forecast];
+}
+
 export async function getSalesTrend(days = 30) {
   const from = new Date();
   from.setDate(from.getDate() - days);

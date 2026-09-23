@@ -705,6 +705,7 @@ export default function ProductionClient({ initialData, houses, feedProducts, in
   const watchedDate = form.watch("date");
   const watchedHouse = form.watch("house");
   const watchedMortality = form.watch("mortality");
+  const watchedAfkir = form.watch("afkir");
 
   const dayName = (() => {
     if (!watchedDate) return "";
@@ -715,28 +716,32 @@ export default function ProductionClient({ initialData, houses, feedProducts, in
     }
   })();
 
-  // Saat menambah data baru, isi Populasi otomatis = populasi sebelumnya - kematian.
+  // Saat menambah data baru, isi Populasi otomatis = populasi sebelumnya - kematian - afkir.
   // Sumber populasi sebelumnya: catatan produksi terakhir untuk kandang itu, atau jika belum ada, data Populasi Saat Ini dari menu Kandang.
+  // Afkir wajib ikut dikurangkan agar suggestion ini tetap sinkron dengan Populasi Saat Ini
+  // di menu Kandang, yang diperbarui staf setiap kali ada ayam diafkir.
   useEffect(() => {
     if (editingId) return;
     if (!watchedHouse) return;
     const kematian = watchedMortality === "" || watchedMortality == null ? 0 : Number(watchedMortality);
+    const afkir = watchedAfkir === "" || watchedAfkir == null ? 0 : Number(watchedAfkir);
+    const berkurang = kematian + afkir;
 
     const previousRecord = anchorRecords
       .filter((r) => r.house.trim().toLowerCase() === watchedHouse.trim().toLowerCase() && r.populasi != null)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
 
     if (previousRecord?.populasi != null) {
-      form.setValue("populasi", Math.max(0, previousRecord.populasi - kematian));
+      form.setValue("populasi", Math.max(0, previousRecord.populasi - berkurang));
       return;
     }
 
     const house = houses.find((h) => h.name.trim().toLowerCase() === watchedHouse.trim().toLowerCase());
     if (house) {
-      form.setValue("populasi", Math.max(0, house.currentPopulation - kematian));
+      form.setValue("populasi", Math.max(0, house.currentPopulation - berkurang));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedHouse, watchedMortality, editingId, anchorRecords, houses]);
+  }, [watchedHouse, watchedMortality, watchedAfkir, editingId, anchorRecords, houses]);
 
   // Auto-isi Umur Ayam = umur ayam catatan sebelumnya + selisih minggu (1 minggu = 7 hari).
   // Only fills when the field is empty or still holds the last auto-suggested value,

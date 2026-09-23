@@ -204,6 +204,12 @@ export interface DailyMetric {
   feedIntake: number | null;
 }
 
+export interface EggPricePoint {
+  month: string;
+  avgPrice: number;
+  isForecast: boolean;
+}
+
 export interface User {
   id: string;
   name: string;

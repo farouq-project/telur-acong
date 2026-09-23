@@ -1,5 +1,5 @@
 import { getTodayProduction, getMonthlyProduction, getProductionTrend, getProductionTrendByHouse, getDailyMetrics, getTodayCrackedEggs, getProductionReportByHouse, getEggFlowByDay } from "./production.service";
-import { getTodaySales, getMonthlySales, getSalesTrend, getEggSalesByType, getSalesReportByCustomer } from "./sales.service";
+import { getTodaySales, getMonthlySales, getSalesTrend, getEggSalesByType, getSalesReportByCustomer, getEggPriceTrend } from "./sales.service";
 import { getEggStock, getFeedStock } from "./stock.service";
 import { getTodayMortality, getMonthlyMortality, getMortalityTrend } from "./mortality.service";
 import { getUpcomingVaccinations } from "./vaccination.service";
@@ -27,6 +27,7 @@ export async function getDashboardStats(reportRange?: { from?: string; to?: stri
     eggSalesByType,
     eggFlow,
     salesReport,
+    eggPriceTrend,
   ] = await Promise.all([
     getEggStock(),
     getTodayProduction(),
@@ -48,6 +49,7 @@ export async function getDashboardStats(reportRange?: { from?: string; to?: stri
     getEggSalesByType(reportRange),
     getEggFlowByDay(reportRange),
     getSalesReportByCustomer(salesRange),
+    getEggPriceTrend(),
   ]);
 
   // Compute per-house metric averages from dailyMetrics (same date range, proven computation).
@@ -97,5 +99,6 @@ export async function getDashboardStats(reportRange?: { from?: string; to?: stri
     stokTelurRetak,
     eggFlow,
     salesReport,
+    eggPriceTrend,
   };
 }
