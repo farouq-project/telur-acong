@@ -48,6 +48,15 @@ export function EggPriceChart({ title, data }: Props) {
     ? Math.round((actualPrices.reduce((a, b) => a + b, 0) / actualPrices.length) * 100) / 100
     : null;
 
+  // Zoom the Y axis to the data's own range (rounded to the nearest 1.000) instead of
+  // starting from 0, so month-to-month price movement is actually visible on the bars.
+  const allPrices = formattedData.map((d) => d.avgPrice);
+  const dataMin = allPrices.length > 0 ? Math.min(...allPrices) : 0;
+  const dataMax = allPrices.length > 0 ? Math.max(...allPrices) : 0;
+  const yAxisMin = Math.floor(dataMin / 1000) * 1000;
+  let yAxisMax = Math.ceil(dataMax / 1000) * 1000;
+  if (yAxisMax <= yAxisMin) yAxisMax = yAxisMin + 1000;
+
   return (
     <Card>
       <CardHeader className="pb-2 pt-4 px-4">
@@ -93,6 +102,7 @@ export function EggPriceChart({ title, data }: Props) {
               interval="preserveStartEnd"
             />
             <YAxis
+              domain={[yAxisMin, yAxisMax]}
               tick={AXIS_TICK_STYLE}
               tickLine={false}
               axisLine={false}
