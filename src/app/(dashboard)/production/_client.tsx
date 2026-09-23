@@ -716,10 +716,11 @@ export default function ProductionClient({ initialData, houses, feedProducts, in
     }
   })();
 
-  // Saat menambah data baru, isi Populasi otomatis = populasi sebelumnya - kematian - afkir.
-  // Sumber populasi sebelumnya: catatan produksi terakhir untuk kandang itu, atau jika belum ada, data Populasi Saat Ini dari menu Kandang.
-  // Afkir wajib ikut dikurangkan agar suggestion ini tetap sinkron dengan Populasi Saat Ini
-  // di menu Kandang, yang diperbarui staf setiap kali ada ayam diafkir.
+  // Saat menambah data baru, isi Populasi otomatis = Populasi Saat Ini (menu Kandang) - kematian - afkir.
+  // Menu Kandang adalah sumber kebenaran populasi (staf memperbaruinya manual setiap kali ada
+  // ayam masuk/pindah/diafkir), jadi field ini SELALU dipakai sebagai dasar — bukan populasi dari
+  // catatan produksi sebelumnya, yang bisa basi begitu ada koreksi manual di menu Kandang yang
+  // tidak tercermin lewat kematian/afkir pada catatan produksi.
   useEffect(() => {
     if (editingId) return;
     if (!watchedHouse) return;
@@ -727,18 +728,20 @@ export default function ProductionClient({ initialData, houses, feedProducts, in
     const afkir = watchedAfkir === "" || watchedAfkir == null ? 0 : Number(watchedAfkir);
     const berkurang = kematian + afkir;
 
+    const house = houses.find((h) => h.name.trim().toLowerCase() === watchedHouse.trim().toLowerCase());
+    if (house) {
+      form.setValue("populasi", Math.max(0, house.currentPopulation - berkurang));
+      return;
+    }
+
+    // Fallback jika kandang tidak ditemukan di daftar House (seharusnya jarang terjadi):
+    // pakai populasi dari catatan produksi terakhir untuk kandang itu.
     const previousRecord = anchorRecords
       .filter((r) => r.house.trim().toLowerCase() === watchedHouse.trim().toLowerCase() && r.populasi != null)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
 
     if (previousRecord?.populasi != null) {
       form.setValue("populasi", Math.max(0, previousRecord.populasi - berkurang));
-      return;
-    }
-
-    const house = houses.find((h) => h.name.trim().toLowerCase() === watchedHouse.trim().toLowerCase());
-    if (house) {
-      form.setValue("populasi", Math.max(0, house.currentPopulation - berkurang));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedHouse, watchedMortality, watchedAfkir, editingId, anchorRecords, houses]);

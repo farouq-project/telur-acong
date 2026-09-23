@@ -27,6 +27,11 @@ interface Props {
 
 const ACTUAL_COLOR = "#7c3aed";
 const FORECAST_COLOR = "#ddd6fe";
+const AXIS_TICK_STYLE = { fontSize: 11, fill: "#1f2937", fontWeight: 700 };
+
+function formatRupiahPerKg(value: number) {
+  return `Rp ${Math.round(value).toLocaleString("id-ID")}/kg`;
+}
 
 export function EggPriceChart({ title, data }: Props) {
   if (!data || data.length === 0) return null;
@@ -35,6 +40,13 @@ export function EggPriceChart({ title, data }: Props) {
     ...d,
     label: format(parseISO(`${d.month}-01`), "MMM yy", { locale: id }),
   }));
+
+  const actualPrices = data.filter((d) => !d.isForecast).map((d) => d.avgPrice);
+  const highest = actualPrices.length > 0 ? Math.max(...actualPrices) : null;
+  const lowest = actualPrices.length > 0 ? Math.min(...actualPrices) : null;
+  const average = actualPrices.length > 0
+    ? Math.round((actualPrices.reduce((a, b) => a + b, 0) / actualPrices.length) * 100) / 100
+    : null;
 
   return (
     <Card>
@@ -53,19 +65,35 @@ export function EggPriceChart({ title, data }: Props) {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="px-1 pb-4">
+      <CardContent className="px-4 pb-4">
+        {(highest != null || lowest != null || average != null) && (
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <div className="rounded-lg bg-red-50 border border-red-100 px-2 py-2 text-center">
+              <p className="text-[10px] text-red-500 font-medium">Harga Tertinggi</p>
+              <p className="text-xs font-bold text-red-700 mt-0.5">{highest != null ? formatRupiahPerKg(highest) : "–"}</p>
+            </div>
+            <div className="rounded-lg bg-green-50 border border-green-100 px-2 py-2 text-center">
+              <p className="text-[10px] text-green-600 font-medium">Harga Terendah</p>
+              <p className="text-xs font-bold text-green-700 mt-0.5">{lowest != null ? formatRupiahPerKg(lowest) : "–"}</p>
+            </div>
+            <div className="rounded-lg bg-purple-50 border border-purple-100 px-2 py-2 text-center">
+              <p className="text-[10px] text-purple-500 font-medium">Harga Rata-rata</p>
+              <p className="text-xs font-bold text-purple-700 mt-0.5">{average != null ? formatRupiahPerKg(average) : "–"}</p>
+            </div>
+          </div>
+        )}
         <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={formattedData} margin={{ top: 4, right: 16, left: -20, bottom: 0 }}>
+          <BarChart data={formattedData} margin={{ top: 4, right: 16, left: -12, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 10, fill: "#9ca3af" }}
+              tick={AXIS_TICK_STYLE}
               tickLine={false}
               axisLine={false}
               interval="preserveStartEnd"
             />
             <YAxis
-              tick={{ fontSize: 10, fill: "#9ca3af" }}
+              tick={AXIS_TICK_STYLE}
               tickLine={false}
               axisLine={false}
             />
@@ -76,7 +104,7 @@ export function EggPriceChart({ title, data }: Props) {
                 fontSize: "12px",
               }}
               formatter={(value: number, _name, props) => [
-                `Rp ${Math.round(value).toLocaleString("id-ID")}/kg`,
+                formatRupiahPerKg(value),
                 props?.payload?.isForecast ? "Perkiraan" : "Aktual",
               ]}
             />
